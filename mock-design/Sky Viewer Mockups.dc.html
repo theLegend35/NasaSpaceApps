@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/nocturne-26c9f44e-0b85-4a2d-8460-bc5ff1905352/styles.css">
+<script src="_ds/nocturne-26c9f44e-0b85-4a2d-8460-bc5ff1905352/_ds_bundle.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>body{margin:0;background:var(--color-neutral-900)}a:hover{color:var(--color-accent-300)}.dv-turn{padding:40px 44px 32px;scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 14px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--color-accent-800);color:var(--color-accent-100);border-radius:4px;text-decoration:none}.dv-tname{font:500 15px/1.2 var(--font-heading);color:var(--color-text)}.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start;margin-bottom:36px}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--color-neutral-800);color:var(--color-neutral-100);border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.3 var(--font-body);color:var(--color-neutral-400)}.dv-card{max-width:100%;background:var(--color-bg);border-radius:var(--radius-md);box-shadow:var(--shadow-md);overflow:hidden}.dv-opt:target .dv-oid{background:var(--color-accent);color:var(--color-bg)}.dv-next{margin:0;font:12px/1.5 var(--font-body);color:var(--color-neutral-400)}</style>
+</helmet>
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Sky viewer: three layouts, plus landing, blink set-up and states</span></div>
+<div style="max-width:1100px;margin:0 0 28px;font-size:13px;color:var(--color-neutral-300);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-8)">
+<p style="margin:0"><strong style="font-weight:500;color:var(--color-text)">What works.</strong> Every artboard shares one player: play, step, scrub, speed, Blink, A/B picking, crosshair, path arrow and the coordinate field are live. Drag any image area to tilt it in 3D; drag the globe to spin it.</p>
+<p style="margin:0"><strong style="font-weight:500;color:var(--color-text)">What is placeholder.</strong> The product name, all sky images, dates, counts and example coordinates. Images are generated star fields with one dot that drifts. Nothing here is real mission data.</p>
+<p style="margin:0"><strong style="font-weight:500;color:var(--color-text)">Decisions I made for you.</strong> The globe lives on the landing page and leads into the tilting image. Only the Blink and Data tabs have content. All five states are mocked. Four switches are visual only (marked in the panel).</p>
+</div>
+
+<div class="dv-opts">
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Panel right: closest to the design doc. Full location panel beside the image.</div>
+<div class="dv-card" data-screen-label="1a Viewer panel right" style="width:1280px;height:800px;display:flex;flex-direction:column">
+<div class="nav"><span class="nav-brand" style="margin-right:var(--space-6)">Sky Timeline</span><input class="input" aria-label="Coordinates or object name" value="{{ q }}" onChange="{{ onQ }}" style="width:320px"><span style="margin-right:auto;font-size:12px;color:{{ msgColor }}">{{ parseMsg }}</span><span class="tag tag-outline">Placeholder data</span><a href="#1d">New search</a></div>
+<div style="flex:1;display:flex;min-height:0">
+<div style="flex:1;display:flex;flex-direction:column;min-width:0">
+<div onPointerDown="{{ dragStart }}" style="position:relative;flex:1;overflow:hidden;perspective:1100px;cursor:grab;touch-action:none;background:radial-gradient(ellipse at 22% 12%, color-mix(in srgb, var(--color-section-glow) 45%, transparent), transparent 60%), radial-gradient(ellipse at 88% 92%, color-mix(in srgb, var(--color-accent-800) 55%, transparent), transparent 55%), var(--color-bg)">
+<div style="position:absolute;inset:0;transform-style:preserve-3d;transform:{{ stageT }}">
+<img src="{{ starsFar }}" alt="" draggable="false" style="position:absolute;left:-30%;top:-30%;width:160%;height:160%;max-width:none;object-fit:cover;transform:translateZ(-520px) scale(1.5);pointer-events:none">
+<img src="{{ starsNear }}" alt="" draggable="false" style="position:absolute;left:-20%;top:-20%;width:140%;height:140%;max-width:none;object-fit:cover;transform:translateZ(-200px) scale(1.2);pointer-events:none;opacity:.8">
+<div style="position:absolute;left:50%;top:50%;width:440px;height:440px;margin:-210px 0 0 -220px;transform-style:preserve-3d">
+<img src="{{ curSrc }}" alt="Sky image" draggable="false" style="width:100%;height:100%;border-radius:var(--radius-md);box-shadow:var(--shadow-lg);pointer-events:none">
+<div style="position:absolute;inset:0;transform:translateZ(34px);pointer-events:none;display:{{ crossDisp }}">
+<div style="position:absolute;left:50%;top:calc(50% - 52px);width:1px;height:32px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;left:50%;top:calc(50% + 20px);width:1px;height:32px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;top:50%;left:calc(50% - 52px);height:1px;width:32px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;top:50%;left:calc(50% + 20px);height:1px;width:32px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;left:calc(50% - 20px);top:calc(50% - 20px);width:40px;height:40px;border:1px solid var(--color-accent-400);border-radius:50%"></div>
+</div>
+<div style="position:absolute;left:50%;top:50%;width:96px;border-top:1px dashed var(--color-accent-200);transform-origin:left;transform:translateZ(34px) rotate(-24deg);pointer-events:none;display:{{ arrowDisp }}"></div>
+<div style="position:absolute;top:-32px;left:0;right:0;transform:translateZ(60px);display:flex;justify-content:space-between;align-items:center;font-size:13px;pointer-events:none"><span>{{ curDate }}</span><span class="tag tag-neutral">Image {{ curNum }} of 8</span></div>
+<span class="tag tag-accent" style="position:absolute;top:10px;right:10px;transform:translateZ(60px);font-size:18px;padding:2px 12px;display:{{ sideDisp }}">{{ sideLabel }}</span>
+</div>
+</div>
+<div class="seg" style="position:absolute;left:var(--space-6);top:var(--space-6);background:var(--color-bg)"><label class="seg-opt"><input type="radio" name="m1" checked="{{ isTime }}" onChange="{{ toTime }}">Timelapse</label><label class="seg-opt"><input type="radio" name="m1" checked="{{ isBlink }}" onChange="{{ toBlink }}">Blink</label></div>
+<div style="position:absolute;right:var(--space-6);top:var(--space-6);display:flex;gap:var(--space-2)"><button class="btn btn-secondary btn-icon" title="Turn left" onClick="{{ orbitL }}" style="background:var(--color-bg)"><i class="ph ph-caret-left"></i></button><button class="btn btn-secondary btn-icon" title="Turn right" onClick="{{ orbitR }}" style="background:var(--color-bg)"><i class="ph ph-caret-right"></i></button><button class="btn btn-secondary" title="Face the image straight on" onClick="{{ resetView }}" style="background:var(--color-bg)"><i class="ph ph-arrow-counter-clockwise"></i>Flat view</button></div>
+<div style="position:absolute;left:var(--space-6);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:var(--space-3)">
+<button onClick="{{ showA }}" title="Show image A" style="position:relative;padding:0;border:1px solid {{ aEdge }};border-radius:var(--radius-md);background:var(--color-bg);cursor:pointer;overflow:hidden;width:92px;height:92px"><img src="{{ aSrc }}" alt="" style="width:100%;height:100%"><span class="tag tag-accent" style="position:absolute;left:4px;top:4px;padding:1px 7px">A</span></button>
+<button onClick="{{ showB }}" title="Show image B" style="position:relative;padding:0;border:1px solid {{ bEdge }};border-radius:var(--radius-md);background:var(--color-bg);cursor:pointer;overflow:hidden;width:92px;height:92px"><img src="{{ bSrc }}" alt="" style="width:100%;height:100%"><span class="tag tag-accent" style="position:absolute;left:4px;top:4px;padding:1px 7px">B</span></button>
+<span style="font-size:11px;color:var(--color-neutral-400);width:92px">Click A, then B, to flip by hand</span>
+</div>
+<span style="position:absolute;left:var(--space-6);bottom:var(--space-4);font-size:11px;color:var(--color-neutral-400)">Drag to tilt · placeholder image, not real data</span>
+</div>
+<div style="display:flex;align-items:center;gap:var(--space-6);padding:var(--space-4) var(--space-6);background:var(--color-surface)">
+<div style="display:{{ timeDisp }};align-items:center;gap:var(--space-1)"><button class="btn btn-secondary btn-icon" title="Previous image" onClick="{{ stepBack }}"><i class="ph ph-skip-back"></i></button><button class="btn btn-secondary btn-icon" title="Play or pause" onClick="{{ togglePlay }}" style="width:48px;height:48px;font-size:20px"><i class="{{ playIcon }}"></i></button><button class="btn btn-secondary btn-icon" title="Next image" onClick="{{ stepFwd }}"><i class="ph ph-skip-forward"></i></button></div>
+<div style="display:{{ blinkDisp }};align-items:center;gap:var(--space-2);font-size:12px;color:var(--color-neutral-400)">Pick for<button class="btn btn-secondary btn-icon" onClick="{{ pickA }}" style="border-color:{{ pickAEdge }}">A</button><button class="btn btn-secondary btn-icon" onClick="{{ pickB }}" style="border-color:{{ pickBEdge }}">B</button></div>
+<button class="btn btn-primary" onClick="{{ toggleBlink }}" style="height:48px;padding:0 20px;font-size:16px;white-space:nowrap;background:{{ blinkBg }};box-shadow:{{ blinkGlow }}"><i class="ph ph-swap"></i>{{ blinkLabel }}</button>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;gap:3px">
+<sc-for list="{{ ticks }}" as="f" hint-placeholder-count="8"><button onClick="{{ f.go }}" title="{{ f.date }}" style="flex:1;min-width:0;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;margin-left:{{ f.gap }};font-family:inherit"><span style="height:16px;line-height:16px;font-size:10px;font-weight:600;color:var(--color-bg);background:var(--color-accent-300);border-radius:4px;padding:0 6px;visibility:{{ f.badgeVis }}">{{ f.badge }}</span><span style="width:100%;height:5px;border-radius:3px;background:{{ f.bar }}"></span><span style="font-size:10.5px;color:{{ f.ink }};white-space:nowrap">{{ f.short }}</span></button></sc-for>
+</div>
+<span style="font-size:11px;color:var(--color-neutral-400)">{{ scrubHint }}</span>
+</div>
+<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--color-neutral-400);width:124px">Speed · {{ speedLabel }}<input type="range" min="0.5" max="4" step="0.5" value="{{ speed }}" onChange="{{ onSpeed }}" style="accent-color:var(--color-accent);width:100%"></label>
+</div>
+</div>
+<div style="width:348px;flex:none;display:flex;flex-direction:column;gap:var(--space-4);padding:var(--space-6);overflow:auto;background:var(--color-surface)">
+<div><h4 style="margin-bottom:4px">{{ tName }}</h4><div style="font-size:13px;color:var(--color-neutral-300)">{{ tCoords }}</div><div style="font-size:13px;color:var(--color-neutral-400)">{{ tKind }}</div></div>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-2)"><span class="tag tag-neutral">8 images</span><span class="tag tag-neutral">3 visits</span><span class="tag tag-neutral">May 2025 to May 2026</span></div>
+<div style="display:flex;gap:var(--space-4);font-size:13px"><sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5"><button onClick="{{ t.go }}" style="background:none;border:0;border-bottom:2px solid {{ t.mark }};padding:4px 0;color:{{ t.ink }};font:inherit;cursor:pointer">{{ t.name }}</button></sc-for></div>
+<div style="display:{{ blinkTabDisp }};flex-direction:column;gap:var(--space-3)">
+<p style="margin:0;font-size:13px;color:var(--color-neutral-300)">Comparing <strong style="font-weight:500;color:var(--color-text)">A</strong> {{ aDate }} with <strong style="font-weight:500;color:var(--color-text)">B</strong> {{ bDate }}, {{ gapText }}.</p>
+<div style="display:flex;gap:var(--space-2)"><button class="btn btn-secondary" onClick="{{ setA }}" style="font-size:13px">Use this image as A</button><button class="btn btn-secondary" onClick="{{ setB }}" style="font-size:13px">Use as B</button></div>
+<div style="display:flex;flex-direction:column;margin-top:var(--space-2)">
+<sc-for list="{{ toggles }}" as="t" hint-placeholder-count="7"><button onClick="{{ t.toggle }}" style="display:flex;align-items:center;gap:10px;width:100%;padding:7px 0;background:none;border:0;color:var(--color-text);font:inherit;font-size:13px;cursor:pointer;text-align:left"><span style="flex:1">{{ t.label }}</span><span style="font-size:10px;color:var(--color-neutral-500)">{{ t.note }}</span><span style="width:30px;height:16px;border-radius:8px;border:1px solid {{ t.edge }};position:relative;flex:none"><span style="position:absolute;top:2px;left:{{ t.x }};width:10px;height:10px;border-radius:50%;background:{{ t.edge }}"></span></span></button></sc-for>
+</div>
+<p style="margin:0;font-size:12px;color:var(--color-neutral-400)">Anything that seems to move is a candidate until a researcher confirms it.</p>
+</div>
+<div style="display:{{ dataTabDisp }}"><table class="table" style="font-size:12px"><thead><tr><th>Date</th><th>Visit</th><th>Status</th></tr></thead><tbody><sc-for list="{{ rows }}" as="r" hint-placeholder-count="8"><tr><td>{{ r.date }}</td><td>{{ r.visit }}</td><td><span class="tag tag-neutral">Placeholder</span></td></tr></sc-for></tbody></table></div>
+<p style="margin:0;font-size:13px;color:var(--color-neutral-400);display:{{ otherTabDisp }}">This tab isn't designed in this round.</p>
+</div>
+</div>
+</div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Immersive: the 3D sky fills the screen, controls float in one dock.</div>
+<div class="dv-card" data-screen-label="1b Viewer immersive" style="width:1280px;height:800px;position:relative">
+<div onPointerDown="{{ dragStart }}" style="position:absolute;inset:0;overflow:hidden;perspective:1100px;cursor:grab;touch-action:none;background:radial-gradient(ellipse at 70% 10%, color-mix(in srgb, var(--color-section-glow) 50%, transparent), transparent 60%), radial-gradient(ellipse at 10% 95%, color-mix(in srgb, var(--color-accent-800) 55%, transparent), transparent 55%), var(--color-bg)">
+<div style="position:absolute;inset:0;transform-style:preserve-3d;transform:{{ stageT }}">
+<img src="{{ starsFar }}" alt="" draggable="false" style="position:absolute;left:-30%;top:-30%;width:160%;height:160%;max-width:none;object-fit:cover;transform:translateZ(-520px) scale(1.5);pointer-events:none">
+<img src="{{ starsNear }}" alt="" draggable="false" style="position:absolute;left:-20%;top:-20%;width:140%;height:140%;max-width:none;object-fit:cover;transform:translateZ(-200px) scale(1.2);pointer-events:none;opacity:.8">
+<div style="position:absolute;left:50%;top:50%;width:500px;height:500px;margin:-310px 0 0 -250px;transform-style:preserve-3d">
+<img src="{{ curSrc }}" alt="Sky image" draggable="false" style="width:100%;height:100%;border-radius:var(--radius-md);box-shadow:var(--shadow-lg);pointer-events:none">
+<div style="position:absolute;inset:0;transform:translateZ(34px);pointer-events:none;display:{{ crossDisp }}">
+<div style="position:absolute;left:50%;top:calc(50% - 56px);width:1px;height:34px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;left:50%;top:calc(50% + 22px);width:1px;height:34px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;top:50%;left:calc(50% - 56px);height:1px;width:34px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;top:50%;left:calc(50% + 22px);height:1px;width:34px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;left:calc(50% - 22px);top:calc(50% - 22px);width:44px;height:44px;border:1px solid var(--color-accent-400);border-radius:50%"></div>
+</div>
+<div style="position:absolute;left:50%;top:50%;width:110px;border-top:1px dashed var(--color-accent-200);transform-origin:left;transform:translateZ(34px) rotate(-24deg);pointer-events:none;display:{{ arrowDisp }}"></div>
+<span class="tag tag-accent" style="position:absolute;top:10px;right:10px;transform:translateZ(60px);font-size:18px;padding:2px 12px;display:{{ sideDisp }}">{{ sideLabel }}</span>
+</div>
+</div>
+</div>
+<div style="position:absolute;left:var(--space-8);top:var(--space-6);right:var(--space-8);display:flex;align-items:center;gap:var(--space-4);pointer-events:none"><span class="nav-brand" style="margin-right:0">Sky Timeline</span><input class="input" aria-label="Coordinates or object name" value="{{ q }}" onChange="{{ onQ }}" style="width:300px;pointer-events:auto"><span style="flex:1"></span><span class="tag tag-outline">Placeholder data</span><button class="btn btn-secondary" onClick="{{ resetView }}" style="pointer-events:auto;background:var(--color-bg)"><i class="ph ph-arrow-counter-clockwise"></i>Flat view</button></div>
+<div class="card elev-sm" style="position:absolute;left:var(--space-8);top:84px;width:250px"><span class="card-kicker">Looking at</span><span class="card-title">{{ tName }}</span><p class="card-body">{{ tCoords }}<br>{{ tKind }}</p><span class="card-meta">8 images · 3 visits · May 2025 to May 2026</span><div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)"><button class="btn btn-secondary" onClick="{{ togCross }}" style="font-size:12px">Crosshair</button><button class="btn btn-secondary" onClick="{{ togArrow }}" style="font-size:12px">Path arrow</button></div></div>
+<div style="position:absolute;right:var(--space-8);top:84px;display:flex;flex-direction:column;gap:var(--space-3);width:132px">
+<button onClick="{{ showA }}" title="Show image A" style="position:relative;padding:0;border:1px solid {{ aEdge }};border-radius:var(--radius-md);background:var(--color-bg);cursor:pointer;overflow:hidden;width:132px;height:132px"><img src="{{ aSrc }}" alt="" style="width:100%;height:100%"><span class="tag tag-accent" style="position:absolute;left:6px;top:6px">A</span></button><span style="font-size:11px;color:var(--color-neutral-300)">{{ aDate }}</span>
+<button onClick="{{ showB }}" title="Show image B" style="position:relative;padding:0;border:1px solid {{ bEdge }};border-radius:var(--radius-md);background:var(--color-bg);cursor:pointer;overflow:hidden;width:132px;height:132px"><img src="{{ bSrc }}" alt="" style="width:100%;height:100%"><span class="tag tag-accent" style="position:absolute;left:6px;top:6px">B</span></button><span style="font-size:11px;color:var(--color-neutral-300)">{{ bDate }}</span>
+<span style="font-size:11px;color:var(--color-neutral-400)">{{ gapText }}. Click A, then B, to flip by hand.</span>
+</div>
+<div class="card elev-md" style="position:absolute;left:var(--space-8);right:var(--space-8);bottom:var(--space-6);gap:var(--space-4);padding:var(--space-4) var(--space-6)">
+<div style="display:flex;align-items:center;gap:var(--space-6)">
+<div class="seg"><label class="seg-opt"><input type="radio" name="m2" checked="{{ isTime }}" onChange="{{ toTime }}">Timelapse</label><label class="seg-opt"><input type="radio" name="m2" checked="{{ isBlink }}" onChange="{{ toBlink }}">Blink</label></div>
+<div style="display:{{ timeDisp }};align-items:center;gap:var(--space-1)"><button class="btn btn-secondary btn-icon" title="Previous image" onClick="{{ stepBack }}"><i class="ph ph-skip-back"></i></button><button class="btn btn-secondary btn-icon" title="Play or pause" onClick="{{ togglePlay }}" style="width:48px;height:48px;font-size:20px"><i class="{{ playIcon }}"></i></button><button class="btn btn-secondary btn-icon" title="Next image" onClick="{{ stepFwd }}"><i class="ph ph-skip-forward"></i></button><button class="btn btn-ghost" onClick="{{ setA }}" style="font-size:13px;margin-left:var(--space-3)">Use as A</button><button class="btn btn-ghost" onClick="{{ setB }}" style="font-size:13px">Use as B</button></div>
+<div style="display:{{ blinkDisp }};align-items:center;gap:var(--space-2);font-size:12px;color:var(--color-neutral-400)">Pick for<button class="btn btn-secondary btn-icon" onClick="{{ pickA }}" style="border-color:{{ pickAEdge }}">A</button><button class="btn btn-secondary btn-icon" onClick="{{ pickB }}" style="border-color:{{ pickBEdge }}">B</button></div>
+<span style="flex:1;font-size:13px">{{ curDate }} <span style="color:var(--color-neutral-400)">· image {{ curNum }} of 8</span></span>
+<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--color-neutral-400);width:124px">Speed · {{ speedLabel }}<input type="range" min="0.5" max="4" step="0.5" value="{{ speed }}" onChange="{{ onSpeed }}" style="accent-color:var(--color-accent);width:100%"></label>
+<button class="btn btn-primary" onClick="{{ toggleBlink }}" style="height:48px;padding:0 22px;font-size:16px;white-space:nowrap;background:{{ blinkBg }};box-shadow:{{ blinkGlow }}"><i class="ph ph-swap"></i>{{ blinkLabel }}</button>
+</div>
+<div style="display:flex;gap:3px">
+<sc-for list="{{ ticks }}" as="f" hint-placeholder-count="8"><button onClick="{{ f.go }}" title="{{ f.date }}" style="flex:1;min-width:0;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;margin-left:{{ f.gap }};font-family:inherit"><span style="height:16px;line-height:16px;font-size:10px;font-weight:600;color:var(--color-bg);background:var(--color-accent-300);border-radius:4px;padding:0 6px;visibility:{{ f.badgeVis }}">{{ f.badge }}</span><span style="width:100%;height:5px;border-radius:3px;background:{{ f.bar }}"></span><span style="font-size:11px;color:{{ f.ink }};white-space:nowrap">{{ f.date }}</span></button></sc-for>
+</div>
+</div>
+</div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Light table: A and B sit beside the image, the timeline is a filmstrip.</div>
+<div class="dv-card" data-screen-label="1c Viewer light table" style="width:1280px;height:800px;display:flex;flex-direction:column">
+<div class="nav"><span class="nav-brand" style="margin-right:var(--space-6)">Sky Timeline</span><input class="input" aria-label="Coordinates or object name" value="{{ q }}" onChange="{{ onQ }}" style="width:320px"><span style="margin-right:auto"></span><span class="tag tag-outline">Placeholder data</span><a href="#1d">New search</a></div>
+<div style="display:flex;align-items:baseline;gap:var(--space-6);padding:0 var(--space-6) var(--space-4)"><h4 style="margin:0">{{ tName }}</h4><span style="font-size:13px;color:var(--color-neutral-300)">{{ tCoords }}</span><span style="font-size:13px;color:var(--color-neutral-400);margin-right:auto">{{ tKind }}</span><span style="font-size:13px;color:var(--color-accent-300)">Blink</span><span style="font-size:13px;color:var(--color-neutral-400)">Spectrum</span><span style="font-size:13px;color:var(--color-neutral-400)">Sources</span><span style="font-size:13px;color:var(--color-neutral-400)">Data</span><span style="font-size:13px;color:var(--color-neutral-400)">Discuss</span></div>
+<div style="flex:1;display:flex;min-height:0">
+<div style="width:252px;flex:none;display:flex;flex-direction:column;gap:var(--space-3);padding:0 var(--space-6) var(--space-4)">
+<span style="font-size:12px;color:var(--color-neutral-400)">Compare two images</span>
+<div style="display:flex;gap:var(--space-3)">
+<button onClick="{{ showA }}" title="Show image A" style="position:relative;padding:0;border:1px solid {{ aEdge }};border-radius:var(--radius-md);background:var(--color-bg);cursor:pointer;overflow:hidden;width:104px;height:104px"><img src="{{ aSrc }}" alt="" style="width:100%;height:100%"><span class="tag tag-accent" style="position:absolute;left:5px;top:5px">A</span></button>
+<button onClick="{{ showB }}" title="Show image B" style="position:relative;padding:0;border:1px solid {{ bEdge }};border-radius:var(--radius-md);background:var(--color-bg);cursor:pointer;overflow:hidden;width:104px;height:104px"><img src="{{ bSrc }}" alt="" style="width:100%;height:100%"><span class="tag tag-accent" style="position:absolute;left:5px;top:5px">B</span></button>
+</div>
+<span style="font-size:12px;color:var(--color-neutral-300)">{{ aDate }} and {{ bDate }}, {{ gapText }}</span>
+<button class="btn btn-primary btn-block" onClick="{{ toggleBlink }}" style="height:56px;font-size:17px;background:{{ blinkBg }};box-shadow:{{ blinkGlow }}"><i class="ph ph-swap"></i>{{ blinkLabel }}</button>
+<div style="display:flex;gap:var(--space-2)"><button class="btn btn-secondary" onClick="{{ setA }}" style="flex:1;font-size:12px">Use current as A</button><button class="btn btn-secondary" onClick="{{ setB }}" style="flex:1;font-size:12px">As B</button></div>
+<p style="margin:var(--space-2) 0 0;font-size:12px;color:var(--color-neutral-400)">Blinking flips between A and B. Anything that moved will seem to jump. It is a candidate until a researcher confirms it.</p>
+<div style="display:flex;gap:var(--space-2);margin-top:auto"><button class="btn btn-secondary" onClick="{{ togCross }}" style="font-size:12px">Crosshair</button><button class="btn btn-secondary" onClick="{{ togArrow }}" style="font-size:12px">Path arrow</button><button class="btn btn-secondary btn-icon" title="Flat view" onClick="{{ resetView }}"><i class="ph ph-arrow-counter-clockwise"></i></button></div>
+</div>
+<div onPointerDown="{{ dragStart }}" style="position:relative;flex:1;overflow:hidden;perspective:1100px;cursor:grab;touch-action:none;border-radius:var(--radius-lg) 0 0 0;background:radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--color-section-glow) 45%, transparent), transparent 62%), var(--color-bg)">
+<div style="position:absolute;inset:0;transform-style:preserve-3d;transform:{{ stageT }}">
+<img src="{{ starsFar }}" alt="" draggable="false" style="position:absolute;left:-30%;top:-30%;width:160%;height:160%;max-width:none;object-fit:cover;transform:translateZ(-520px) scale(1.5);pointer-events:none">
+<img src="{{ starsNear }}" alt="" draggable="false" style="position:absolute;left:-20%;top:-20%;width:140%;height:140%;max-width:none;object-fit:cover;transform:translateZ(-200px) scale(1.2);pointer-events:none;opacity:.8">
+<div style="position:absolute;left:50%;top:50%;width:400px;height:400px;margin:-190px 0 0 -200px;transform-style:preserve-3d">
+<img src="{{ curSrc }}" alt="Sky image" draggable="false" style="width:100%;height:100%;border-radius:var(--radius-md);box-shadow:var(--shadow-lg);pointer-events:none">
+<div style="position:absolute;inset:0;transform:translateZ(34px);pointer-events:none;display:{{ crossDisp }}">
+<div style="position:absolute;left:50%;top:calc(50% - 50px);width:1px;height:30px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;left:50%;top:calc(50% + 20px);width:1px;height:30px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;top:50%;left:calc(50% - 50px);height:1px;width:30px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;top:50%;left:calc(50% + 20px);height:1px;width:30px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;left:calc(50% - 20px);top:calc(50% - 20px);width:40px;height:40px;border:1px solid var(--color-accent-400);border-radius:50%"></div>
+</div>
+<div style="position:absolute;left:50%;top:50%;width:88px;border-top:1px dashed var(--color-accent-200);transform-origin:left;transform:translateZ(34px) rotate(-24deg);pointer-events:none;display:{{ arrowDisp }}"></div>
+<div style="position:absolute;top:-32px;left:0;right:0;transform:translateZ(60px);display:flex;justify-content:space-between;align-items:center;font-size:13px;pointer-events:none"><span>{{ curDate }}</span><span class="tag tag-neutral">Image {{ curNum }} of 8</span></div>
+<span class="tag tag-accent" style="position:absolute;top:10px;right:10px;transform:translateZ(60px);font-size:18px;padding:2px 12px;display:{{ sideDisp }}">{{ sideLabel }}</span>
+</div>
+</div>
+<span style="position:absolute;left:var(--space-6);bottom:var(--space-4);font-size:11px;color:var(--color-neutral-400)">Drag to tilt · placeholder image, not real data</span>
+</div>
+</div>
+<div style="display:flex;align-items:flex-end;gap:var(--space-6);padding:var(--space-4) var(--space-6);background:var(--color-surface)">
+<div style="display:flex;flex-direction:column;gap:var(--space-3)">
+<div class="seg" style="align-self:flex-start"><label class="seg-opt"><input type="radio" name="m3" checked="{{ isTime }}" onChange="{{ toTime }}">Timelapse</label><label class="seg-opt"><input type="radio" name="m3" checked="{{ isBlink }}" onChange="{{ toBlink }}">Blink</label></div>
+<div style="display:{{ timeDisp }};align-items:center;gap:var(--space-1);height:48px"><button class="btn btn-secondary btn-icon" title="Previous image" onClick="{{ stepBack }}"><i class="ph ph-skip-back"></i></button><button class="btn btn-secondary btn-icon" title="Play or pause" onClick="{{ togglePlay }}" style="width:48px;height:48px;font-size:20px"><i class="{{ playIcon }}"></i></button><button class="btn btn-secondary btn-icon" title="Next image" onClick="{{ stepFwd }}"><i class="ph ph-skip-forward"></i></button></div>
+<div style="display:{{ blinkDisp }};align-items:center;gap:var(--space-2);height:48px;font-size:12px;color:var(--color-neutral-400)">Pick for<button class="btn btn-secondary btn-icon" onClick="{{ pickA }}" style="border-color:{{ pickAEdge }}">A</button><button class="btn btn-secondary btn-icon" onClick="{{ pickB }}" style="border-color:{{ pickBEdge }}">B</button></div>
+</div>
+<div style="flex:1;display:flex;gap:var(--space-2);min-width:0">
+<sc-for list="{{ ticks }}" as="f" hint-placeholder-count="8"><button onClick="{{ f.go }}" title="{{ f.date }}" style="background:none;border:0;cursor:pointer;display:flex;flex-direction:column;gap:4px;padding:0;margin-left:{{ f.gap }};font-family:inherit;text-align:left"><span style="font-size:10.5px;height:14px;color:var(--color-neutral-400);white-space:nowrap">{{ f.pass }}</span><span style="position:relative;display:block;width:84px;height:84px;border-radius:var(--radius-md);overflow:hidden;border:1px solid {{ f.ring }}"><img src="{{ f.src }}" alt="" style="width:100%;height:100%"><span style="position:absolute;left:4px;top:4px;height:16px;line-height:16px;font-size:10px;font-weight:600;color:var(--color-bg);background:var(--color-accent-300);border-radius:4px;padding:0 6px;visibility:{{ f.badgeVis }}">{{ f.badge }}</span></span><span style="font-size:10.5px;color:{{ f.ink }};white-space:nowrap">{{ f.short }}</span></button></sc-for>
+</div>
+<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--color-neutral-400);width:124px;padding-bottom:var(--space-4)">Speed · {{ speedLabel }}<input type="range" min="0.5" max="4" step="0.5" value="{{ speed }}" onChange="{{ onSpeed }}" style="accent-color:var(--color-accent);width:100%"></label>
+</div>
+</div></div>
+</div>
+
+<div class="dv-opts">
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Landing: enter coordinates or spin the sky globe.</div>
+<div class="dv-card" data-screen-label="1d Landing" style="width:1280px;height:720px;display:flex;flex-direction:column;background:radial-gradient(ellipse at 78% 40%, color-mix(in srgb, var(--color-section) 70%, transparent), transparent 58%), var(--color-bg)">
+<div class="nav"><span class="nav-brand">Sky Timeline</span><span class="tag tag-outline">Placeholder name and data</span></div>
+<div style="flex:1;display:flex;align-items:center;gap:var(--space-8);padding:0 var(--space-8) var(--space-8) 64px">
+<div style="width:480px;flex:none;display:flex;flex-direction:column;gap:var(--space-4)">
+<h1 style="margin:0;text-wrap:pretty">Watch any patch of sky change over time</h1>
+<p style="margin:0;color:var(--color-neutral-300);text-wrap:pretty">Tell us where to look. We line up every image space telescopes have taken of that spot and play them like a short film.</p>
+<div class="field" style="margin-top:var(--space-4)"><label for="q-landing">Where in the sky?</label>
+<div style="display:flex;gap:var(--space-2)"><input id="q-landing" class="input" value="{{ q }}" onChange="{{ onQ }}" placeholder="08h55m10.8s -07d14m42s"><a class="btn btn-primary" href="#1a" style="white-space:nowrap">Show images<i class="ph ph-arrow-right"></i></a></div></div>
+<span style="font-size:13px;color:{{ msgColor }}">{{ parseMsg }}</span>
+<span style="font-size:12px;color:var(--color-neutral-400)">Works with 08h55m10.8s -07d14m42s, 133.795 -7.245, or an object name.</span>
+<span style="font-size:12px;color:var(--color-neutral-400);margin-top:var(--space-4)">Or start with one of these</span>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-2)"><sc-for list="{{ examples }}" as="x" hint-placeholder-count="5"><button class="btn btn-secondary" onClick="{{ x.go }}" style="flex-direction:column;align-items:flex-start;gap:1px;border-color:{{ x.edge }}"><span>{{ x.name }}</span><span style="font-size:11px;color:var(--color-neutral-400)">{{ x.kind }}</span></button></sc-for></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:var(--space-2)">
+<canvas ref="{{ globeRef }}" width="1120" height="1120" onPointerDown="{{ globeDown }}" style="width:560px;height:560px;cursor:grab;touch-action:none"></canvas>
+<span style="font-size:12px;color:var(--color-neutral-400)">Drag to spin · click any spot to pick it · example positions are approximate</span>
+</div>
+</div>
+</div></div>
+</div>
+
+<div class="dv-opts">
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Blink set-up: choosing images A and B.</div>
+<div class="dv-card" data-screen-label="1e Blink set-up" style="width:1280px;display:flex;gap:var(--space-8);padding:var(--space-8)">
+<div style="width:330px;flex:none;display:flex;flex-direction:column;gap:var(--space-4)">
+<h4 style="margin:0">Choose two images to compare</h4>
+<p style="margin:0;font-size:13px;color:var(--color-neutral-300);text-wrap:pretty">Blinking flips between two images of the same spot. Stars stay put. Anything that moved or changed brightness seems to jump.</p>
+<div style="display:flex;gap:var(--space-4)">
+<button onClick="{{ pickA }}" style="display:flex;flex-direction:column;gap:6px;padding:var(--space-2);border:1px solid {{ pickAEdge }};border-radius:var(--radius-md);background:var(--color-surface);cursor:pointer;color:var(--color-text);font:inherit;text-align:left"><span style="position:relative;display:block"><img src="{{ aSrc }}" alt="" style="width:140px;height:140px;border-radius:var(--radius-sm)"><span class="tag tag-accent" style="position:absolute;left:5px;top:5px">A</span></span><span style="font-size:12px">{{ aDate }}</span></button>
+<button onClick="{{ pickB }}" style="display:flex;flex-direction:column;gap:6px;padding:var(--space-2);border:1px solid {{ pickBEdge }};border-radius:var(--radius-md);background:var(--color-surface);cursor:pointer;color:var(--color-text);font:inherit;text-align:left"><span style="position:relative;display:block"><img src="{{ bSrc }}" alt="" style="width:140px;height:140px;border-radius:var(--radius-sm)"><span class="tag tag-accent" style="position:absolute;left:5px;top:5px">B</span></span><span style="font-size:12px">{{ bDate }}</span></button>
+</div>
+<span style="font-size:12px;color:var(--color-neutral-400)">{{ pickHint }} These two are {{ gapText }}.</span>
+<span style="font-size:12px;color:var(--color-neutral-400);margin-top:var(--space-2)">Quick picks</span>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-2)"><button class="btn btn-secondary" onClick="{{ presetFar }}" style="font-size:13px">First and last</button><button class="btn btn-secondary" onClick="{{ presetYear }}" style="font-size:13px">One year apart</button><button class="btn btn-secondary" onClick="{{ presetNear }}" style="font-size:13px">Days apart</button></div>
+</div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-6)">
+<sc-for list="{{ passes }}" as="p" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:var(--space-2)"><span style="font-size:12px;color:var(--color-neutral-400)">{{ p.label }}</span><div style="display:flex;gap:var(--space-3)"><sc-for list="{{ p.items }}" as="f" hint-placeholder-count="3"><button onClick="{{ f.assign }}" title="{{ f.date }}" style="background:none;border:0;cursor:pointer;display:flex;flex-direction:column;gap:4px;padding:0;font-family:inherit;text-align:left"><span style="position:relative;display:block;width:104px;height:104px;border-radius:var(--radius-md);overflow:hidden;border:1px solid {{ f.pickRing }}"><img src="{{ f.src }}" alt="" style="width:100%;height:100%"><span style="position:absolute;left:4px;top:4px;height:16px;line-height:16px;font-size:10px;font-weight:600;color:var(--color-bg);background:var(--color-accent-300);border-radius:4px;padding:0 6px;visibility:{{ f.badgeVis }}">{{ f.badge }}</span></span><span style="font-size:11px;color:var(--color-neutral-300)">{{ f.date }}</span></button></sc-for></div></div></sc-for>
+</div>
+<div style="width:300px;flex:none;display:flex;flex-direction:column;gap:var(--space-4)">
+<span style="font-size:12px;color:var(--color-neutral-400)">Preview</span>
+<div style="position:relative"><img src="{{ blinkPreview }}" alt="Blink preview" style="width:300px;height:300px;border-radius:var(--radius-md);box-shadow:var(--shadow-sm)"><span class="tag tag-accent" style="position:absolute;top:10px;right:10px;font-size:18px;padding:2px 12px">{{ previewLabel }}</span></div>
+<label style="display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--color-neutral-400)">Flip speed · {{ speedLabel }}<input type="range" min="0.5" max="4" step="0.5" value="{{ speed }}" onChange="{{ onSpeed }}" style="accent-color:var(--color-accent);width:100%"></label>
+<button class="btn btn-primary btn-block" onClick="{{ toggleBlink }}" style="height:52px;font-size:16px;margin:0;background:{{ blinkBg }};box-shadow:{{ blinkGlow }}"><i class="ph ph-swap"></i>{{ blinkLabel }}</button>
+</div>
+</div></div>
+</div>
+
+<div class="dv-opts">
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>States: what the image area shows when things aren't ready.</div>
+<div class="dv-card" data-screen-label="1f States" style="width:1280px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--space-6);padding:var(--space-8)">
+<div class="card elev-sm" style="min-height:250px"><span class="card-kicker">Loading</span><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-2);margin:var(--space-2) 0"><span style="aspect-ratio:1;border-radius:var(--radius-sm);background:var(--color-neutral-800)"></span><span style="aspect-ratio:1;border-radius:var(--radius-sm);background:var(--color-neutral-800)"></span><span style="aspect-ratio:1;border-radius:var(--radius-sm);background:var(--color-neutral-900)"></span><span style="aspect-ratio:1;border-radius:var(--radius-sm);background:var(--color-neutral-900)"></span></div><span class="card-title">Fetching images</span><p class="card-body">2 of 8 ready. You can start playing as soon as the first ones arrive.</p></div>
+<div class="card elev-sm" style="min-height:250px"><span class="card-kicker">No coverage</span><i class="ph ph-binoculars" style="font-size:28px;color:var(--color-neutral-400)"></i><span class="card-title">No images of this spot yet</span><p class="card-body">The survey hasn't photographed this patch of sky. Try a nearby spot or one of the examples.</p><a class="btn btn-secondary" href="#1d" style="align-self:flex-start">See examples</a></div>
+<div class="card elev-sm" style="min-height:250px"><span class="card-kicker">Input error</span><i class="ph ph-question" style="font-size:28px;color:var(--color-neutral-400)"></i><span class="card-title">We couldn't read those coordinates</span><p class="card-body">Try 133.795 -7.245, or 08h55m10.8s -07d14m42s, or an object name.</p><a class="btn btn-primary" href="#1d" style="align-self:flex-start">Edit coordinates</a></div>
+<div class="card elev-sm" style="min-height:250px"><span class="card-kicker">Slow server</span><i class="ph ph-hourglass-medium" style="font-size:28px;color:var(--color-neutral-400)"></i><span class="card-title">Waking up the data server</span><p class="card-body">This can take up to a minute the first time. Your images will appear on their own, no need to reload.</p></div>
+<div class="card elev-sm" style="min-height:250px"><span class="card-kicker">Partial result</span><i class="ph ph-warning" style="font-size:28px;color:var(--color-neutral-400)"></i><span class="card-title">2 images couldn't be downloaded</span><p class="card-body">Showing the other 6. The missing dates are marked on the timeline.</p><button class="btn btn-secondary" style="align-self:flex-start">Try again</button></div>
+</div></div>
+</div>
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#1b">1b</a> but keep the full panel from <a class="dv-oid" href="#1a">1a</a>" · "make the filmstrip from <a class="dv-oid" href="#1c">1c</a> the timeline everywhere" · "design the Spectrum and Sources tabs"</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  FR = [
+    { iso: '2025-05-12', p: 'Visit 1 · May 2025' }, { iso: '2025-05-15' }, { iso: '2025-05-19' },
+    { iso: '2025-11-03', p: 'Visit 2 · Nov 2025' }, { iso: '2025-11-07' },
+    { iso: '2026-05-11', p: 'Visit 3 · May 2026' }, { iso: '2026-05-14' }, { iso: '2026-05-18' }
+  ];
+  TARGETS = [
+    { name: 'WISE 0855', kind: 'Cold brown dwarf', ra: 133.795, dec: -7.245 },
+    { name: "Barnard's Star", kind: 'Fast-moving nearby star', ra: 269.452, dec: 4.693 },
+    { name: 'Epsilon Indi B', kind: 'Brown dwarf pair', ra: 330.84, dec: -56.786 },
+    { name: 'RW Aurigae', kind: 'Young flickering star', ra: 76.956, dec: 30.401 },
+    { name: 'R Draconis', kind: 'Pulsing red giant', ra: 248.168, dec: 66.755 }
+  ];
+  TOG = [
+    ['crosshair', 'Crosshair on target', ''], ['arrow', 'Predicted path arrow', ''], ['loop', 'Loop playback', ''],
+    ['diff', 'Show only what changed', 'mockup only'], ['deep', 'Add older archive image', 'mockup only'],
+    ['mask', 'Hide bad pixels', 'mockup only'], ['known', 'Label known objects', 'mockup only']
+  ];
+  state = { frame: 0, playing: false, speed: 2, mode: 'time', blinking: false, side: 'a', a: 0, b: 7, pick: 'a', orbit: -16, tilt: 8, tab: 'Blink', q: 'WISE 0855', tog: { crosshair: true, loop: true } };
+
+  componentDidMount() { this._loop(); const t = this._target(); this._gl = (t.ra - 90) * Math.PI / 180 - 0.35; this._gt = t.dec * Math.PI / 180 + 0.25; this._flown = t.ra + ',' + t.dec; this._drawGlobe(); }
+  componentDidUpdate() { const t = this._target(), k = t.ra + ',' + t.dec; if (k !== this._flown) { this._flown = k; this._fly(t.ra, t.dec); } }
+  componentWillUnmount() { clearTimeout(this._t); cancelAnimationFrame(this._raf); }
+  _loop() {
+    this._t = setTimeout(() => {
+      const s = this.state, N = this.FR.length;
+      if (s.blinking) this.setState({ side: s.side === 'a' ? 'b' : 'a' });
+      else if (s.playing) { const n = s.frame + 1; if (n < N) this.setState({ frame: n }); else this.setState(s.tog.loop ? { frame: 0 } : { playing: false }); }
+      this._loop();
+    }, 1000 / this.state.speed);
+  }
+  _rng(seed) { return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296; }
+  _gen() {
+    const S = 420, r = this._rng(7), stars = [];
+    for (let i = 0; i < 140; i++) stars.push([r() * S, r() * S, Math.pow(r(), 6) * 3.4 + 0.5, r() * 0.7 + 0.3]);
+    this._frames = this.FR.map((f, i) => {
+      const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), n = this._rng(100 + i);
+      x.fillStyle = '#0d0e15'; x.fillRect(0, 0, S, S);
+      for (let k = 0; k < 2600; k++) { x.fillStyle = 'rgba(200,205,225,' + (n() * 0.09) + ')'; x.fillRect(n() * S, n() * S, 1.5, 1.5); }
+      const dot = (px, py, rad, al) => { const g = x.createRadialGradient(px, py, 0, px, py, rad * 3); g.addColorStop(0, 'rgba(240,240,248,' + al + ')'); g.addColorStop(0.35, 'rgba(220,222,240,' + al * 0.5 + ')'); g.addColorStop(1, 'rgba(220,222,240,0)'); x.fillStyle = g; x.beginPath(); x.arc(px, py, rad * 3, 0, 7); x.fill(); };
+      stars.forEach(s => dot(s[0] + (n() - 0.5) * 0.6, s[1] + (n() - 0.5) * 0.6, s[2], s[3] * (0.9 + n() * 0.1)));
+      dot(S / 2 + (i - 3.5) * 9, S / 2 - (i - 3.5) * 4, 2.3, 0.95);
+      return c.toDataURL('image/jpeg', 0.86);
+    });
+    const layer = (seed, count, max) => { const c = document.createElement('canvas'); c.width = 1100; c.height = 800; const x = c.getContext('2d'), n = this._rng(seed);
+      for (let k = 0; k < count; k++) { const big = Math.pow(n(), 5) * max + 0.4; x.fillStyle = (n() > 0.8 ? 'rgba(210,206,253,' : 'rgba(233,233,237,') + (0.25 + n() * 0.65) + ')'; x.beginPath(); x.arc(n() * 1100, n() * 800, big, 0, 7); x.fill(); }
+      return c.toDataURL('image/png'); };
+    this._far = layer(21, 520, 1.3); this._near = layer(42, 150, 2.4);
+    const g = this._rng(5), ti = 62.9 * Math.PI / 180; this._gstars = [];
+    for (let k = 0; k < 1300; k++) {
+      let lon = g() * 2 * Math.PI, lat = k < 600 ? Math.asin(g() * 2 - 1) : ((g() + g() + g()) / 3 - 0.5) * 0.7;
+      const x0 = Math.cos(lat) * Math.cos(lon), y0 = Math.sin(lat), z0 = Math.cos(lat) * Math.sin(lon);
+      this._gstars.push(k < 600 ? [x0, y0, z0, Math.pow(g(), 4) * 3 + 0.8, 0.35 + g() * 0.6] : [x0, y0 * Math.cos(ti) - z0 * Math.sin(ti), y0 * Math.sin(ti) + z0 * Math.cos(ti), g() * 1.4 + 0.6, 0.2 + g() * 0.4]);
+    }
+  }
+  _fmt(iso, short) { const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], p = iso.split('-'); return +p[2] + ' ' + m[+p[1] - 1] + ' ' + (short ? p[0].slice(2) : p[0]); }
+  _parse(q) {
+    q = (q || '').trim().replace(/−/g, '-'); if (!q) return null;
+    const lc = q.toLowerCase(), t = q.length >= 3 && this.TARGETS.find(t => t.name.toLowerCase().startsWith(lc)); if (t) return t;
+    let m = q.match(/^(\d{1,2})[h:\s]+(\d{1,2})[m:\s]+([\d.]+)s?[\s,]+([+-]?)(\d{1,2})[d°:\s]+(\d{1,2})[m':\s]+([\d.]+)[s"]?$/i), ra, dec;
+    if (m) { ra = (+m[1] + m[2] / 60 + m[3] / 3600) * 15; dec = (m[4] === '-' ? -1 : 1) * (+m[5] + m[6] / 60 + m[7] / 3600); }
+    else if ((m = q.match(/^(\d+(?:\.\d+)?)[\s,]+([+-]?\d+(?:\.\d+)?)$/))) { ra = +m[1]; dec = +m[2]; }
+    else return null;
+    if (!(ra >= 0 && ra < 360 && Math.abs(dec) <= 90)) return null;
+    return { name: 'Custom spot', kind: 'No named object at this position', ra, dec };
+  }
+  _target() { const p = this._parse(this.state.q); this._ok = !!p; if (p) this._last = p; return this._last || this.TARGETS[0]; }
+  _coords(t) { return 'RA ' + t.ra.toFixed(3) + '° · Dec ' + (t.dec < 0 ? '−' : '+') + Math.abs(t.dec).toFixed(3) + '°'; }
+
+  _proj(v) { const cl = Math.cos(this._gl), sl = Math.sin(this._gl), ct = Math.cos(this._gt), st = Math.sin(this._gt); const x = v[0] * cl + v[2] * sl, z = -v[0] * sl + v[2] * cl; return [x, v[1] * ct - z * st, v[1] * st + z * ct]; }
+  _vec(ra, dec) { const a = ra * Math.PI / 180, d = dec * Math.PI / 180; return [Math.cos(d) * Math.cos(a), Math.sin(d), Math.cos(d) * Math.sin(a)]; }
+  _drawGlobe() {
+    const c = this._gref && this._gref.current; if (!c || !this._gstars) return;
+    const x = c.getContext('2d'), W = c.width, R = W * 0.44, cx = W / 2, cy = W / 2;
+    const P = v => { const p = this._proj(v); return [cx + R * p[0], cy - R * p[1], p[2]]; };
+    x.clearRect(0, 0, W, W);
+    const g = x.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R); g.addColorStop(0, '#353b80'); g.addColorStop(0.6, '#262a60'); g.addColorStop(1, '#161826');
+    x.globalAlpha = 0.6; x.fillStyle = g; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill(); x.globalAlpha = 1; x.lineWidth = 1.5;
+    const seg = pts => { for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; x.strokeStyle = 'rgba(181,171,252,' + (a[2] > 0 && b[2] > 0 ? 0.26 : 0.06) + ')'; x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); } };
+    for (let ra = 0; ra < 360; ra += 30) { const pts = []; for (let d = -90; d <= 90; d += 5) pts.push(P(this._vec(ra, d))); seg(pts); }
+    for (let d = -60; d <= 60; d += 30) { const pts = []; for (let ra = 0; ra <= 360; ra += 5) pts.push(P(this._vec(ra, d))); seg(pts); }
+    for (const s of this._gstars) { const p = P(s); x.fillStyle = 'rgba(233,233,237,' + (p[2] > 0 ? s[4] : s[4] * 0.15) + ')'; x.beginPath(); x.arc(p[0], p[1], s[3], 0, 7); x.fill(); }
+    x.strokeStyle = 'rgba(147,151,171,.7)'; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.stroke();
+    const sel = this._target(); x.font = '500 22px Inter, sans-serif';
+    this._pins = this.TARGETS.map(t => { const p = P(this._vec(t.ra, t.dec)); if (p[2] > 0) { x.fillStyle = '#b5abfc'; x.beginPath(); x.arc(p[0], p[1], 7, 0, 7); x.fill(); if (t !== sel) { x.fillStyle = '#cfd3e5'; x.fillText(t.name, p[0] + 16, p[1] + 8); } } return [p, t]; });
+    const p = P(this._vec(sel.ra, sel.dec));
+    if (p[2] > 0) { x.strokeStyle = '#d2cefd'; x.lineWidth = 2.5; x.beginPath(); x.arc(p[0], p[1], 26, 0, 7); x.moveTo(p[0] - 46, p[1]); x.lineTo(p[0] - 26, p[1]); x.moveTo(p[0] + 26, p[1]); x.lineTo(p[0] + 46, p[1]); x.moveTo(p[0], p[1] - 46); x.lineTo(p[0], p[1] - 26); x.moveTo(p[0], p[1] + 26); x.lineTo(p[0], p[1] + 46); x.stroke(); x.fillStyle = '#f5f4ff'; x.fillText(sel.name, p[0] + 54, p[1] + 8); }
+  }
+  _fly(ra, dec) {
+    cancelAnimationFrame(this._raf); const l0 = this._gl, t0 = this._gt, t1 = dec * Math.PI / 180; let dl = ((ra - 90) * Math.PI / 180 - l0) % (2 * Math.PI); if (dl > Math.PI) dl -= 2 * Math.PI; if (dl < -Math.PI) dl += 2 * Math.PI;
+    const st = performance.now(), step = now => { const k = Math.min(1, (now - st) / 800), e = 1 - Math.pow(1 - k, 3); this._gl = l0 + dl * e; this._gt = t0 + (t1 - t0) * e; this._drawGlobe(); if (k < 1) this._raf = requestAnimationFrame(step); };
+    this._raf = requestAnimationFrame(step);
+  }
+  globeDown = e => {
+    e.stopPropagation(); cancelAnimationFrame(this._raf);
+    const c = this._gref.current, sx = e.clientX, sy = e.clientY, l0 = this._gl, t0 = this._gt; let moved = 0;
+    const mv = ev => { const dx = ev.clientX - sx, dy = ev.clientY - sy; moved = Math.max(moved, Math.abs(dx) + Math.abs(dy)); this._gl = l0 - dx * 0.006; this._gt = Math.max(-1.4, Math.min(1.4, t0 + dy * 0.006)); this._drawGlobe(); };
+    const up = ev => {
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved > 5) return;
+      const r = c.getBoundingClientRect(), k = c.width / r.width, px = (ev.clientX - r.left) * k, py = (ev.clientY - r.top) * k, W = c.width, R = W * 0.44;
+      const hit = (this._pins || []).find(p => p[0][2] > 0 && Math.hypot(p[0][0] - px, p[0][1] - py) < 30);
+      if (hit) return this.setState({ q: hit[1].name });
+      const x = (px - W / 2) / R, y2 = -(py - W / 2) / R, d = 1 - x * x - y2 * y2; if (d < 0) return;
+      const z2 = Math.sqrt(d), ct = Math.cos(this._gt), st = Math.sin(this._gt), y = y2 * ct + z2 * st, z = -y2 * st + z2 * ct, cl = Math.cos(this._gl), sl = Math.sin(this._gl);
+      const ra = (Math.atan2(x * sl + z * cl, x * cl - z * sl) * 180 / Math.PI + 360) % 360, dec = Math.asin(Math.max(-1, Math.min(1, y))) * 180 / Math.PI;
+      this._flown = null; this.setState({ q: ra.toFixed(3) + ' ' + dec.toFixed(3) });
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up);
+  };
+  dragStart = e => {
+    if (e.target.closest('button,label,input,a')) return; e.stopPropagation();
+    const sx = e.clientX, sy = e.clientY, o = this.state.orbit, t = this.state.tilt;
+    const mv = ev => this.setState({ orbit: Math.max(-40, Math.min(40, o + (ev.clientX - sx) * 0.25)), tilt: Math.max(-30, Math.min(30, t - (ev.clientY - sy) * 0.25)) });
+    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up);
+  };
+  _assign(k, i, extra) { this.setState(s => { const o = k === 'a' ? 'b' : 'a', u = Object.assign({ [k]: i }, extra); if (s[o] === i) u[o] = s[k]; return u; }); }
+  _tog(k) { this.setState(s => ({ tog: Object.assign({}, s.tog, { [k]: !s.tog[k] }) })); }
+
+  renderVals() {
+    if (!this._frames) this._gen();
+    if (!this._gref) this._gref = React.createRef();
+    const s = this.state, N = this.FR.length, blinkMode = s.mode === 'blink', cur = blinkMode ? s[s.side] : s.frame, tgt = this._target();
+    const days = Math.abs(Math.round((new Date(this.FR[s.b].iso) - new Date(this.FR[s.a].iso)) / 864e5));
+    const edge = on => on ? 'var(--color-accent-400)' : 'var(--color-divider)';
+    const ticks = this.FR.map((f, i) => {
+      const isA = i === s.a, isB = i === s.b, on = i === cur;
+      return { date: this._fmt(f.iso), short: this._fmt(f.iso, true), src: this._frames[i], pass: f.p || '',
+        go: () => blinkMode ? this._assign(s.pick, i, { side: s.pick }) : this.setState({ frame: i, playing: false }),
+        assign: () => this._assign(s.pick, i, { side: s.pick, mode: 'blink', playing: false }),
+        badge: isA ? 'A' : isB ? 'B' : '', badgeVis: isA || isB ? 'visible' : 'hidden',
+        bar: on ? 'var(--color-accent-400)' : isA || isB ? 'var(--color-accent-700)' : 'var(--color-neutral-800)',
+        ink: on ? 'var(--color-text)' : 'var(--color-neutral-500)', ring: on ? 'var(--color-accent-400)' : 'transparent',
+        pickRing: isA || isB ? 'var(--color-accent-400)' : 'transparent', gap: f.p && i ? '18px' : '0px', gapSm: f.p && i ? '10px' : '0px' };
+    });
+    const passes = []; ticks.forEach((t, i) => { if (this.FR[i].p) passes.push({ label: this.FR[i].p, items: [] }); passes[passes.length - 1].items.push(t); });
+    return {
+      q: s.q, onQ: e => this.setState({ q: e.target.value }),
+      parseMsg: this._ok ? 'Got it: ' + tgt.name + ', ' + this._coords(tgt) : "We couldn't read that. Try 133.795 -7.245 or an object name.",
+      msgColor: this._ok ? 'var(--color-neutral-400)' : 'var(--color-accent-300)',
+      tName: tgt.name, tCoords: this._coords(tgt), tKind: tgt.kind,
+      examples: this.TARGETS.map(t => ({ name: t.name, kind: t.kind, go: () => this.setState({ q: t.name }), edge: edge(t === tgt) })),
+      globeRef: this._gref, globeDown: this.globeDown,
+      starsFar: this._far, starsNear: this._near, curSrc: this._frames[cur], curDate: this._fmt(this.FR[cur].iso), curNum: cur + 1,
+      stageT: 'rotateX(' + s.tilt + 'deg) rotateY(' + s.orbit + 'deg)', dragStart: this.dragStart,
+      orbitL: () => this.setState({ orbit: Math.max(-40, s.orbit - 10) }), orbitR: () => this.setState({ orbit: Math.min(40, s.orbit + 10) }), resetView: () => this.setState({ orbit: 0, tilt: 0 }),
+      crossDisp: s.tog.crosshair ? 'block' : 'none', arrowDisp: s.tog.arrow ? 'block' : 'none', togCross: () => this._tog('crosshair'), togArrow: () => this._tog('arrow'),
+      sideDisp: blinkMode ? 'inline-flex' : 'none', sideLabel: s.side.toUpperCase(),
+      isTime: !blinkMode, isBlink: blinkMode, timeDisp: blinkMode ? 'none' : 'flex', blinkDisp: blinkMode ? 'flex' : 'none',
+      toTime: () => this.setState({ mode: 'time', blinking: false, frame: cur }), toBlink: () => this.setState({ mode: 'blink', playing: false }),
+      togglePlay: () => this.setState({ playing: !s.playing }), playIcon: s.playing ? 'ph-fill ph-pause' : 'ph-fill ph-play',
+      stepBack: () => this.setState({ frame: (s.frame + N - 1) % N, playing: false }), stepFwd: () => this.setState({ frame: (s.frame + 1) % N, playing: false }),
+      toggleBlink: () => this.setState(s.blinking ? { blinking: false } : { blinking: true, mode: 'blink', playing: false }),
+      blinkLabel: s.blinking ? 'Stop blinking' : 'Blink A ⇄ B',
+      blinkBg: s.blinking ? 'var(--color-accent-800)' : 'transparent', blinkGlow: s.blinking ? '0 0 26px color-mix(in srgb, var(--color-accent) 50%, transparent)' : 'none',
+      speed: s.speed, speedLabel: s.speed + ' per second', onSpeed: e => this.setState({ speed: +e.target.value }),
+      ticks, passes, scrubHint: blinkMode ? 'Click a date to set image ' + s.pick.toUpperCase() : 'Click a date to jump there',
+      aSrc: this._frames[s.a], bSrc: this._frames[s.b], aDate: this._fmt(this.FR[s.a].iso), bDate: this._fmt(this.FR[s.b].iso), gapText: days + ' days apart',
+      aEdge: edge(blinkMode && s.side === 'a'), bEdge: edge(blinkMode && s.side === 'b'),
+      showA: () => this.setState({ mode: 'blink', side: 'a', pick: 'a', blinking: false, playing: false }), showB: () => this.setState({ mode: 'blink', side: 'b', pick: 'b', blinking: false, playing: false }),
+      pickA: () => this.setState({ pick: 'a', side: 'a', mode: 'blink', playing: false }), pickB: () => this.setState({ pick: 'b', side: 'b', mode: 'blink', playing: false }),
+      pickAEdge: edge(s.pick === 'a'), pickBEdge: edge(s.pick === 'b'), pickHint: 'Now choosing image ' + s.pick.toUpperCase() + '. Click a picture on the right.',
+      setA: () => this._assign('a', cur), setB: () => this._assign('b', cur),
+      presetFar: () => this.setState({ a: 0, b: 7 }), presetYear: () => this.setState({ a: 0, b: 5 }), presetNear: () => this.setState({ a: 3, b: 4 }),
+      blinkPreview: this._frames[s[s.side]], previewLabel: s.side.toUpperCase(),
+      tabs: ['Blink', 'Spectrum', 'Sources', 'Data', 'Discuss'].map(n => ({ name: n, go: () => this.setState({ tab: n }), mark: s.tab === n ? 'var(--color-accent)' : 'transparent', ink: s.tab === n ? 'var(--color-text)' : 'var(--color-neutral-400)' })),
+      blinkTabDisp: s.tab === 'Blink' ? 'flex' : 'none', dataTabDisp: s.tab === 'Data' ? 'block' : 'none', otherTabDisp: s.tab === 'Blink' || s.tab === 'Data' ? 'none' : 'block',
+      toggles: this.TOG.map(t => ({ label: t[1], note: t[2], toggle: () => this._tog(t[0]), edge: s.tog[t[0]] ? 'var(--color-accent-400)' : 'var(--color-neutral-600)', x: s.tog[t[0]] ? '16px' : '2px' })),
+      rows: this.FR.map((f, i) => ({ date: this._fmt(f.iso), visit: i < 3 ? 'May 2025' : i < 5 ? 'Nov 2025' : 'May 2026' }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

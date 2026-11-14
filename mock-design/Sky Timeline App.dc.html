@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-26c9f44e-0b85-4a2d-8460-bc5ff1905352/styles.css">
+<script src="_ds/nocturne-26c9f44e-0b85-4a2d-8460-bc5ff1905352/_ds_bundle.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>html,body{height:100%}body{margin:0;overflow:hidden}a:hover{color:var(--color-accent-300)}</style>
+</helmet>
+<div style="height:100vh;min-height:560px;display:flex;flex-direction:column">
+<div class="nav" style="gap:var(--space-6);flex-wrap:wrap;row-gap:var(--space-2)"><span class="nav-brand" style="margin-right:var(--space-4)">Sky Timeline</span>
+<div style="display:flex;gap:var(--space-6);margin-right:auto;flex-wrap:wrap"><sc-for list="{{ navTabs }}" as="t" hint-placeholder-count="6"><button onClick="{{ t.go }}" style="background:none;border:0;border-bottom:2px solid {{ t.mark }};color:{{ t.ink }};font:inherit;font-size:14px;padding:5px 0;cursor:pointer;white-space:nowrap">{{ t.name }}</button></sc-for></div>
+<span class="tag tag-outline">Placeholder name and data</span></div>
+
+<div data-screen-label="Explore and Target" style="display:{{ skyDisp }};flex:1;min-height:0">
+<div style="display:{{ railDisp }};width:272px;flex:none;flex-direction:column;gap:var(--space-3);padding:var(--space-6);overflow:auto;background:var(--color-surface)">
+<h4 style="margin:0;text-wrap:pretty">Pick a spot. Watch it change.</h4>
+<p style="margin:0 0 var(--space-3);font-size:13px;color:var(--color-neutral-300);text-wrap:pretty">Search for an object or enter a position. Then blink real observations to see what moved.</p>
+<div class="field"><label for="nm">Search the sky</label><input id="nm" class="input" value="{{ nameQ }}" onChange="{{ onName }}" onKeyDown="{{ nameKey }}" placeholder="WISE 0855" style="background:var(--color-bg)"></div>
+<button class="btn btn-primary" onClick="{{ find }}">Find target<i class="ph ph-arrow-right"></i></button>
+<span style="font-size:12px;color:var(--color-neutral-400);margin-top:var(--space-3)">Or go to coordinates</span>
+<div style="display:flex;gap:var(--space-2)"><div class="field" style="flex:1;min-width:0"><label for="ra">Right ascension</label><input id="ra" class="input" value="{{ raQ }}" onChange="{{ onRa }}" onKeyDown="{{ coordKey }}" placeholder="133.795" style="background:var(--color-bg)"></div><div class="field" style="flex:1;min-width:0"><label for="dc">Declination</label><input id="dc" class="input" value="{{ decQ }}" onChange="{{ onDec }}" onKeyDown="{{ coordKey }}" placeholder="-7.245" style="background:var(--color-bg)"></div></div>
+<button class="btn btn-primary" onClick="{{ locate }}">Locate in sky<i class="ph ph-arrow-right"></i></button>
+<span style="font-size:12px;color:var(--color-accent-300);min-height:18px">{{ err }}</span>
+<span style="font-size:11px;color:var(--color-neutral-400)">Degrees (133.795, -7.245) or 08h55m10.8s and -07d14m42s both work.</span>
+<span style="font-size:12px;color:var(--color-neutral-400);margin-top:var(--space-4)">Example targets</span>
+<sc-for list="{{ examples }}" as="x" hint-placeholder-count="5"><button onClick="{{ x.go }}" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);border:1px solid {{ x.edge }};border-radius:var(--radius-md);background:none;color:var(--color-text);font:inherit;text-align:left;cursor:pointer" style-hover="background:var(--color-neutral-900)"><i class="ph ph-star-four" style="font-size:18px;color:var(--color-accent-400)"></i><span style="display:flex;flex-direction:column"><span style="font-size:14px">{{ x.name }}</span><span style="font-size:11px;color:var(--color-neutral-400)">{{ x.kind }}</span></span></button></sc-for>
+</div>
+
+<div style="position:relative;flex:1;min-width:0;overflow:hidden;background:radial-gradient(ellipse at 50% 50%, color-mix(in srgb, var(--color-section) 65%, transparent), transparent 70%), var(--color-bg)">
+<canvas ref="{{ globeRef }}" onPointerDown="{{ globeDown }}" style="position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none"></canvas>
+<div style="position:absolute;left:var(--space-6);top:var(--space-6);right:190px;display:flex;flex-direction:column;gap:var(--space-2);pointer-events:none">
+<span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-accent-300)">{{ globeKicker }}</span>
+<h4 style="margin:0;text-wrap:pretty">{{ globeTitle }}</h4>
+<span style="font-size:12px;color:var(--color-neutral-400)">Drag to rotate · click a target or any spot to go deeper</span>
+<button class="btn btn-secondary" onClick="{{ toExplore }}" style="display:{{ backDisp }};align-self:flex-start;pointer-events:auto;background:var(--color-bg);margin-top:var(--space-2)"><i class="ph ph-arrow-left"></i>Whole sky</button>
+</div>
+<div class="seg" style="position:absolute;right:var(--space-6);top:var(--space-6);background:var(--color-bg)"><label class="seg-opt"><input type="radio" name="proj" checked="{{ yes }}" onChange="{{ noop }}">3D globe</label><label class="seg-opt" title="Not designed yet" style="opacity:.45;cursor:not-allowed"><input type="radio" name="proj" disabled>2D map</label></div>
+<div style="position:absolute;left:var(--space-6);bottom:var(--space-6);display:flex;flex-direction:column;gap:var(--space-2);pointer-events:none"><span ref="{{ readRef }}" style="font-size:12px;color:var(--color-neutral-300);font-variant-numeric:tabular-nums"></span><span class="tag tag-neutral">Illustrative globe · placeholder stars</span></div>
+<div style="position:absolute;right:var(--space-6);bottom:var(--space-6);display:flex;align-items:flex-end;gap:var(--space-3)"><button class="btn btn-secondary" onClick="{{ copyLink }}" style="background:var(--color-bg)"><i class="ph ph-link"></i>{{ copyLabel }}</button><div style="display:flex;flex-direction:column;gap:var(--space-2)"><button class="btn btn-secondary btn-icon" title="Zoom in" onClick="{{ zoomIn }}" style="background:var(--color-bg)"><i class="ph ph-plus"></i></button><button class="btn btn-secondary btn-icon" title="Zoom out" onClick="{{ zoomOut }}" style="background:var(--color-bg)"><i class="ph ph-minus"></i></button></div></div>
+</div>
+
+<div style="width:{{ panelW }};flex:none;transition:width .5s ease;overflow-y:auto;overflow-x:hidden;background:var(--color-surface)">
+<div style="display:{{ compactDisp }};flex-direction:column;gap:var(--space-4);padding:var(--space-6);width:340px">
+<span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-accent-300)">Location panel</span>
+<div><h4 style="margin:0 0 4px">{{ tName }}</h4><div style="font-size:13px;color:var(--color-neutral-300)">{{ tCoords }}</div><div style="font-size:13px;color:var(--color-neutral-400)">{{ tKind }}</div></div>
+<div style="position:relative"><img src="{{ curSrc }}" alt="Sky image preview" style="width:100%;aspect-ratio:1;border-radius:var(--radius-md);box-shadow:var(--shadow-sm)"><span class="tag tag-neutral" style="position:absolute;left:8px;top:8px">Image {{ curNum }} of 8</span><span style="position:absolute;right:8px;bottom:8px;font-size:11px;color:var(--color-neutral-300)">Placeholder image</span></div>
+<div style="display:flex;align-items:center;gap:var(--space-2)"><button class="btn btn-secondary btn-icon" title="Previous image" onClick="{{ stepBack }}"><i class="ph ph-skip-back"></i></button><button class="btn btn-secondary btn-icon" title="Play or pause" onClick="{{ togglePlay }}"><i class="{{ playIcon }}"></i></button><button class="btn btn-secondary btn-icon" title="Next image" onClick="{{ stepFwd }}"><i class="ph ph-skip-forward"></i></button><span style="font-size:13px;margin-left:var(--space-2)">{{ curDate }}</span></div>
+<button class="btn btn-primary" onClick="{{ toTarget }}" style="height:48px;font-size:16px">Open target view<i class="ph ph-arrow-right"></i></button>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)"><div class="card" style="background:var(--color-bg)"><span class="card-kicker">Right ascension</span><span class="card-title">{{ tRa }}</span></div><div class="card" style="background:var(--color-bg)"><span class="card-kicker">Declination</span><span class="card-title">{{ tDec }}</span></div></div>
+<span style="font-size:12px;color:var(--color-neutral-400)">8 images · 3 visits · May 2025 to May 2026</span>
+</div>
+
+<div style="display:{{ deepDisp }};flex-direction:column;gap:var(--space-4);padding:var(--space-6);min-width:440px">
+<div style="display:flex;align-items:flex-start;gap:var(--space-4)"><div style="flex:1;min-width:0"><span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-accent-300)">Target view</span><h3 style="margin:2px 0 4px">{{ tName }}</h3><div style="font-size:13px;color:var(--color-neutral-300)">{{ tCoords }} · {{ tKind }}</div></div><button class="btn btn-secondary" onClick="{{ shareFeed }}"><i class="ph ph-share-network"></i>{{ shareLabel }}</button></div>
+<div style="display:flex;gap:var(--space-6);font-size:13px"><sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.go }}" style="background:none;border:0;border-bottom:2px solid {{ t.mark }};padding:4px 0;color:{{ t.ink }};font:inherit;cursor:pointer">{{ t.name }}</button></sc-for></div>
+
+<div style="display:{{ blinkTabDisp }};flex-direction:column;gap:var(--space-4)">
+<div onPointerDown="{{ dragStart }}" style="position:relative;height:400px;border-radius:var(--radius-md);overflow:hidden;perspective:1000px;cursor:grab;touch-action:none;background:radial-gradient(ellipse at 25% 10%, color-mix(in srgb, var(--color-section-glow) 45%, transparent), transparent 60%), var(--color-bg)">
+<div style="position:absolute;inset:0;transform-style:preserve-3d;transform:{{ stageT }}">
+<img src="{{ starsFar }}" alt="" draggable="false" style="position:absolute;left:-30%;top:-30%;width:160%;height:160%;max-width:none;object-fit:cover;transform:translateZ(-480px) scale(1.5);pointer-events:none">
+<img src="{{ starsNear }}" alt="" draggable="false" style="position:absolute;left:-20%;top:-20%;width:140%;height:140%;max-width:none;object-fit:cover;transform:translateZ(-180px) scale(1.2);pointer-events:none;opacity:.8">
+<div style="position:absolute;left:50%;top:50%;width:320px;height:320px;margin:-150px 0 0 -160px;transform-style:preserve-3d">
+<img src="{{ curSrc }}" alt="Sky image" draggable="false" style="width:100%;height:100%;border-radius:var(--radius-md);box-shadow:var(--shadow-lg);pointer-events:none">
+<div style="position:absolute;inset:0;transform:translateZ(30px);pointer-events:none;display:{{ crossDisp }}">
+<div style="position:absolute;left:50%;top:calc(50% - 46px);width:1px;height:28px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;left:50%;top:calc(50% + 18px);width:1px;height:28px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;top:50%;left:calc(50% - 46px);height:1px;width:28px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;top:50%;left:calc(50% + 18px);height:1px;width:28px;background:var(--color-accent-400)"></div>
+<div style="position:absolute;left:calc(50% - 18px);top:calc(50% - 18px);width:36px;height:36px;border:1px solid var(--color-accent-400);border-radius:50%"></div>
+</div>
+<div style="position:absolute;left:50%;top:50%;width:76px;border-top:1px dashed var(--color-accent-200);transform-origin:left;transform:translateZ(30px) rotate(-24deg);pointer-events:none;display:{{ arrowDisp }}"></div>
+<div style="position:absolute;top:-30px;left:0;right:0;transform:translateZ(50px);display:flex;justify-content:space-between;align-items:center;font-size:13px;pointer-events:none"><span>{{ curDate }}</span><span class="tag tag-neutral">Image {{ curNum }} of 8</span></div>
+<span class="tag tag-accent" style="position:absolute;top:8px;right:8px;transform:translateZ(50px);font-size:17px;padding:2px 11px;display:{{ sideDisp }}">{{ sideLabel }}</span>
+</div>
+</div>
+<div class="seg" style="position:absolute;left:var(--space-4);top:var(--space-4);background:var(--color-bg)"><label class="seg-opt"><input type="radio" name="mode" checked="{{ isTime }}" onChange="{{ toTime }}">Timelapse</label><label class="seg-opt"><input type="radio" name="mode" checked="{{ isBlink }}" onChange="{{ toBlink }}">Blink</label></div>
+<button class="btn btn-secondary" title="Face the image straight on" onClick="{{ resetView }}" style="position:absolute;right:var(--space-4);top:var(--space-4);background:var(--color-bg)"><i class="ph ph-arrow-counter-clockwise"></i>Flat view</button>
+<div style="position:absolute;left:var(--space-4);bottom:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2)">
+<button onClick="{{ showA }}" title="Show image A" style="position:relative;padding:0;border:1px solid {{ aEdge }};border-radius:var(--radius-md);background:var(--color-bg);cursor:pointer;overflow:hidden;width:72px;height:72px"><img src="{{ aSrc }}" alt="" style="width:100%;height:100%"><span class="tag tag-accent" style="position:absolute;left:3px;top:3px;padding:1px 6px">A</span></button>
+<button onClick="{{ showB }}" title="Show image B" style="position:relative;padding:0;border:1px solid {{ bEdge }};border-radius:var(--radius-md);background:var(--color-bg);cursor:pointer;overflow:hidden;width:72px;height:72px"><img src="{{ bSrc }}" alt="" style="width:100%;height:100%"><span class="tag tag-accent" style="position:absolute;left:3px;top:3px;padding:1px 6px">B</span></button>
+</div>
+<span style="position:absolute;right:var(--space-4);bottom:var(--space-3);font-size:11px;color:var(--color-neutral-400)">Drag to tilt · placeholder image</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-4)">
+<div style="display:{{ timeDisp }};align-items:center;gap:var(--space-1)"><button class="btn btn-secondary btn-icon" title="Previous image" onClick="{{ stepBack }}"><i class="ph ph-skip-back"></i></button><button class="btn btn-secondary btn-icon" title="Play or pause" onClick="{{ togglePlay }}" style="width:48px;height:48px;font-size:20px"><i class="{{ playIcon }}"></i></button><button class="btn btn-secondary btn-icon" title="Next image" onClick="{{ stepFwd }}"><i class="ph ph-skip-forward"></i></button></div>
+<div style="display:{{ blinkDisp }};align-items:center;gap:var(--space-2);font-size:12px;color:var(--color-neutral-400);height:48px">Pick for<button class="btn btn-secondary btn-icon" onClick="{{ pickA }}" style="border-color:{{ pickAEdge }}">A</button><button class="btn btn-secondary btn-icon" onClick="{{ pickB }}" style="border-color:{{ pickBEdge }}">B</button></div>
+<button class="btn btn-primary" onClick="{{ toggleBlink }}" style="height:48px;padding:0 20px;font-size:16px;white-space:nowrap;background:{{ blinkBg }};box-shadow:{{ blinkGlow }}"><i class="ph ph-swap"></i>{{ blinkLabel }}</button>
+<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--color-neutral-400);flex:1;min-width:120px">Speed · {{ speedLabel }}<input type="range" min="0.5" max="4" step="0.5" value="{{ speed }}" onChange="{{ onSpeed }}" style="accent-color:var(--color-accent);width:100%"></label>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;gap:3px"><sc-for list="{{ ticks }}" as="f" hint-placeholder-count="8"><button onClick="{{ f.go }}" title="{{ f.date }}" style="flex:1;min-width:0;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;margin-left:{{ f.gap }};font-family:inherit"><span style="height:16px;line-height:16px;font-size:10px;font-weight:600;color:var(--color-bg);background:var(--color-accent-300);border-radius:4px;padding:0 6px;visibility:{{ f.badgeVis }}">{{ f.badge }}</span><span style="width:100%;height:5px;border-radius:3px;background:{{ f.bar }}"></span><span style="font-size:10.5px;color:{{ f.ink }};white-space:nowrap">{{ f.short }}</span></button></sc-for></div>
+<span style="font-size:11px;color:var(--color-neutral-400)">{{ scrubHint }}</span>
+</div>
+<p style="margin:0;font-size:13px;color:var(--color-neutral-300)">Comparing <strong style="font-weight:500;color:var(--color-text)">A</strong> {{ aDate }} with <strong style="font-weight:500;color:var(--color-text)">B</strong> {{ bDate }}, {{ gapText }}.</p>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-2)"><button class="btn btn-secondary" onClick="{{ setA }}" style="font-size:13px">Use this image as A</button><button class="btn btn-secondary" onClick="{{ setB }}" style="font-size:13px">Use as B</button><sc-for list="{{ toggles }}" as="t" hint-placeholder-count="3"><button class="btn btn-secondary" onClick="{{ t.toggle }}" style="font-size:13px;border-color:{{ t.edge }};color:{{ t.ink }}">{{ t.label }}</button></sc-for></div>
+<p style="margin:0;font-size:12px;color:var(--color-neutral-400)">Anything that seems to move is a candidate until a researcher confirms it.</p>
+</div>
+
+<div style="display:{{ dataTabDisp }}"><table class="table" style="font-size:13px"><thead><tr><th>Date</th><th>Visit</th><th>Status</th></tr></thead><tbody><sc-for list="{{ rows }}" as="r" hint-placeholder-count="8"><tr><td>{{ r.date }}</td><td>{{ r.visit }}</td><td><span class="tag tag-neutral">Placeholder</span></td></tr></sc-for></tbody></table></div>
+<div style="display:{{ nextTabDisp }};flex-direction:column;gap:var(--space-2);font-size:13px;color:var(--color-neutral-300)"><span>Spectrum: what the object is made of, from its colors.</span><span>Sources: every known object in this patch of sky.</span><span>Discuss: public posts about this spot.</span><span style="color:var(--color-neutral-400)">These tabs aren't designed yet.</span></div>
+</div>
+</div>
+</div>
+
+<div data-screen-label="Research hub" style="display:{{ hubDisp }};flex:1;min-height:0;overflow:auto;padding:var(--space-8) clamp(16px,5vw,64px)">
+<div style="max-width:1080px;display:flex;flex-direction:column;gap:var(--space-6)">
+<div><h2 style="margin:0 0 var(--space-2)">Research hub</h2><p style="margin:0;color:var(--color-neutral-300);max-width:620px">Help check what the software flagged. Look at one candidate at a time and say what you see. Viewing never needs an account. Voting does.</p></div>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-8);align-items:flex-start">
+<div class="card elev-sm" style="flex:1 1 460px;gap:var(--space-4);padding:var(--space-6)">
+<div style="display:flex;align-items:center;gap:var(--space-3)"><span class="card-kicker" style="margin-right:auto">Candidate queue · {{ hubCount }}</span><span class="tag tag-neutral">Placeholder candidate</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-6)">
+<div style="position:relative;flex:none"><img src="{{ blinkPreview }}" alt="Candidate blink" style="width:240px;height:240px;border-radius:var(--radius-md)"><span class="tag tag-accent" style="position:absolute;top:8px;right:8px">{{ sideLabel }}</span></div>
+<div style="flex:1 1 180px;display:flex;flex-direction:column;gap:var(--space-3)"><span class="card-title">{{ hubName }}</span><span style="font-size:13px;color:var(--color-neutral-300)">Software's guess: {{ hubGuess }}</span><span style="font-size:12px;color:var(--color-neutral-400)">Confidence score appears here once measured.</span><button class="btn btn-primary" onClick="{{ toggleBlink }}" style="align-self:flex-start;background:{{ blinkBg }};box-shadow:{{ blinkGlow }}"><i class="ph ph-swap"></i>{{ blinkLabel }}</button><span style="font-size:12px;color:var(--color-neutral-400);margin-top:var(--space-2)">Known look-alikes of this type</span><div style="display:flex;gap:var(--space-2)"><img src="{{ look1 }}" alt="" style="width:56px;height:56px;border-radius:var(--radius-sm)"><img src="{{ look2 }}" alt="" style="width:56px;height:56px;border-radius:var(--radius-sm)"><img src="{{ look3 }}" alt="" style="width:56px;height:56px;border-radius:var(--radius-sm)"></div></div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-2)"><button class="btn btn-primary" onClick="{{ vote }}">Matches</button><button class="btn btn-secondary" onClick="{{ vote }}">It's more like something else</button><button class="btn btn-secondary" onClick="{{ vote }}">Looks like an image glitch</button><button class="btn btn-secondary" onClick="{{ vote }}">Can't tell</button></div>
+<span style="font-size:12px;color:var(--color-accent-300);min-height:18px">{{ hubMsg }}</span>
+</div>
+<div style="flex:1 1 320px;display:flex;flex-direction:column;gap:var(--space-4)">
+<h5 style="margin:0">Top candidates</h5>
+<table class="table" style="font-size:13px"><thead><tr><th>Candidate</th><th>Leading answer</th><th>Votes</th></tr></thead><tbody><sc-for list="{{ board }}" as="b" hint-placeholder-count="3"><tr><td>{{ b.name }}</td><td>{{ b.guess }}</td><td>{{ b.votes }}</td></tr></sc-for></tbody></table>
+<div style="display:flex;gap:var(--space-2)"><button class="btn btn-secondary" style="font-size:13px"><i class="ph ph-download-simple"></i>CSV</button><button class="btn btn-secondary" style="font-size:13px"><i class="ph ph-download-simple"></i>VOTable</button></div>
+<div class="card" style="margin-top:var(--space-3)"><span class="card-kicker">Verified researchers</span><span class="card-title">Expert queue</span><p class="card-body">Candidates the public and the software disagree on. Researchers can confirm or relabel them.</p><button class="btn btn-secondary" style="align-self:flex-start;font-size:13px">Sign in with ORCID</button></div>
+</div>
+</div>
+</div>
+</div>
+
+<div data-screen-label="Sky feed" style="display:{{ feedDisp }};flex:1;min-height:0;overflow:auto;padding:var(--space-8) clamp(16px,5vw,64px)">
+<div style="max-width:1080px;display:flex;flex-direction:column;gap:var(--space-6)">
+<div><h2 style="margin:0 0 var(--space-2)">Sky feed</h2><p style="margin:0;color:var(--color-neutral-300);max-width:620px">What people are finding. Every post comes from the Share button in the viewer, so each one links back to the exact view.</p></div>
+<div style="display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap"><div class="seg"><sc-for list="{{ sorts }}" as="o" hint-placeholder-count="3"><label class="seg-opt"><input type="radio" name="sort" checked="{{ o.on }}" onChange="{{ o.go }}">{{ o.name }}</label></sc-for></div><span class="tag tag-neutral">Placeholder posts</span></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-6)">
+<sc-for list="{{ posts }}" as="p" hint-placeholder-count="3"><div class="card elev-sm" style="gap:var(--space-3)">
+<img src="{{ p.src }}" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:var(--radius-sm)">
+<div style="display:flex;align-items:center;gap:var(--space-2);font-size:12px;color:var(--color-neutral-300)"><span style="width:24px;height:24px;border-radius:50%;background:var(--color-accent-800);color:var(--color-accent-100);display:grid;place-items:center;font-size:10px">{{ p.initials }}</span>{{ p.user }}<span class="tag tag-accent" style="margin-left:auto">{{ p.tag }}</span></div>
+<p class="card-body" style="opacity:1;color:var(--color-neutral-200)">{{ p.caption }}</p>
+<span class="card-meta">{{ p.dates }} · {{ p.comments }} comments</span>
+<div style="display:flex;gap:var(--space-2);flex-wrap:wrap"><button class="btn btn-primary" onClick="{{ p.fly }}" style="font-size:13px"><i class="ph ph-crosshair"></i>Fly there</button><button class="btn btn-secondary" style="font-size:13px">Follow</button><button class="btn btn-ghost" style="font-size:13px;margin-left:auto;color:var(--color-neutral-400)">Report</button></div>
+</div></sc-for>
+</div>
+</div>
+</div>
+
+<div data-screen-label="Learn" style="display:{{ learnDisp }};flex:1;min-height:0;overflow:auto;padding:var(--space-8) clamp(16px,5vw,64px)">
+<div style="max-width:1080px;display:flex;flex-direction:column;gap:var(--space-6)">
+<div><h2 style="margin:0 0 var(--space-2)">Learn</h2><p style="margin:0;color:var(--color-neutral-300);max-width:620px">Short guided missions on the real viewer. Each one walks you to the right view and checks what you find.</p></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-6)">
+<sc-for list="{{ missions }}" as="m" hint-placeholder-count="3"><div class="card elev-sm" style="min-height:190px"><span class="card-kicker">Mission {{ m.n }} · {{ m.level }}</span><span class="card-title">{{ m.title }}</span><p class="card-body">{{ m.body }}</p><span class="card-meta">Target: {{ m.target }}</span><button class="btn btn-primary" onClick="{{ m.go }}" style="align-self:flex-start;opacity:{{ m.op }}">{{ m.cta }}</button></div></sc-for>
+</div>
+<h5 style="margin:var(--space-4) 0 0">Ideas in one minute</h5>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-3)"><sc-for list="{{ concepts }}" as="c" hint-placeholder-count="5"><div class="card" style="flex:1 1 180px"><span class="card-title" style="font-size:15px">{{ c.name }}</span><p class="card-body">{{ c.body }}</p></div></sc-for></div>
+<h5 style="margin:var(--space-4) 0 0">Stories</h5>
+<div style="display:flex;flex-wrap:wrap;gap:var(--space-3)"><div class="card" style="flex:1 1 280px"><span class="card-title" style="font-size:15px">Pluto was found by blinking</span><p class="card-body">Two photographs, one small dot that jumped.</p></div><div class="card" style="flex:1 1 280px"><span class="card-title" style="font-size:15px">Volunteers who found brown dwarfs</span><p class="card-body">How members of the public spotted faint neighbours of the Sun.</p></div></div>
+</div>
+</div>
+
+<div data-screen-label="About" style="display:{{ aboutDisp }};flex:1;min-height:0;overflow:auto;padding:var(--space-8) clamp(16px,5vw,64px)">
+<div style="max-width:760px;display:flex;flex-direction:column;gap:var(--space-6)">
+<h2 style="margin:0;text-wrap:pretty">See how any patch of sky changes over time</h2>
+<p style="margin:0;color:var(--color-neutral-300)">Space telescopes photograph the same places again and again. This tool lines those photographs up so anyone can play them back and spot what moved or changed.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-6)">
+<div style="display:flex;flex-direction:column;gap:var(--space-2)"><i class="ph ph-globe-hemisphere-west" style="font-size:26px;color:var(--color-accent-400)"></i><h5 style="margin:0">1. Pick a spot</h5><p style="margin:0;font-size:13px;color:var(--color-neutral-300)">Spin the globe, search a name or type coordinates.</p></div>
+<div style="display:flex;flex-direction:column;gap:var(--space-2)"><i class="ph ph-play" style="font-size:26px;color:var(--color-accent-400)"></i><h5 style="margin:0">2. Play the images</h5><p style="margin:0;font-size:13px;color:var(--color-neutral-300)">Every image of that spot, in date order, like a short film.</p></div>
+<div style="display:flex;flex-direction:column;gap:var(--space-2)"><i class="ph ph-swap" style="font-size:26px;color:var(--color-accent-400)"></i><h5 style="margin:0">3. Blink two of them</h5><p style="margin:0;font-size:13px;color:var(--color-neutral-300)">Flip between two dates. Stars stay put. Movers jump.</p></div>
+</div>
+<h5 style="margin:var(--space-4) 0 0">Three promises</h5>
+<p style="margin:0;font-size:14px;color:var(--color-neutral-300)">We call things candidates, never discoveries.</p>
+<p style="margin:0;font-size:14px;color:var(--color-neutral-300)">Every number shown is fetched or measured. Anything else is labelled as a placeholder.</p>
+<p style="margin:0;font-size:14px;color:var(--color-neutral-300)">Looking never needs an account.</p>
+<button class="btn btn-primary" onClick="{{ toExplore }}" style="align-self:flex-start;height:44px;padding:0 18px">Start exploring<i class="ph ph-arrow-right"></i></button>
+</div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  FR = [
+    { iso: '2025-05-12', p: 1 }, { iso: '2025-05-15' }, { iso: '2025-05-19' },
+    { iso: '2025-11-03', p: 1 }, { iso: '2025-11-07' },
+    { iso: '2026-05-11', p: 1 }, { iso: '2026-05-14' }, { iso: '2026-05-18' }
+  ];
+  TARGETS = [
+    { name: 'WISE 0855', kind: 'Cold brown dwarf', ra: 133.795, dec: -7.245 },
+    { name: "Barnard's Star", kind: 'Fast-moving nearby star', ra: 269.452, dec: 4.693 },
+    { name: 'Epsilon Indi B', kind: 'Brown dwarf pair', ra: 330.84, dec: -56.786 },
+    { name: 'RW Aurigae', kind: 'Young flickering star', ra: 76.956, dec: 30.401 },
+    { name: 'R Draconis', kind: 'Pulsing red giant', ra: 248.168, dec: 66.755 }
+  ];
+  HUB = [['Candidate 014', 'brown dwarf, likely'], ['Candidate 027', 'asteroid, likely'], ['Candidate 031', 'star that changes brightness, likely']];
+  state = { tab: 'explore', target: this.TARGETS[0], nameQ: 'WISE 0855', raQ: '133.795', decQ: '-7.245', err: '', narrow: false, copied: false, shared: false,
+    frame: 0, playing: false, speed: 2, mode: 'time', blinking: false, side: 'a', a: 0, b: 7, pick: 'a', orbit: -14, tilt: 7, ptab: 'Blink', tog: { crosshair: true, loop: true },
+    hub: 0, hubMsg: '', sort: 'Trending' };
+
+  componentDidMount() {
+    this._loop(); const t = this.state.target; this._gl = (t.ra - 90) * Math.PI / 180 - 0.4; this._gt = t.dec * Math.PI / 180 + 0.3; this._gz = 1; this._key = this._viewKey();
+    this._onR = () => { const n = innerWidth < 1080; if (n !== this.state.narrow) this.setState({ narrow: n }); this._drawGlobe(); }; addEventListener('resize', this._onR); this._onR();
+    const c = this._gref.current; if (c && window.ResizeObserver) { this._ro = new ResizeObserver(() => this._drawGlobe()); this._ro.observe(c); }
+    this._drawGlobe();
+  }
+  componentDidUpdate() { const k = this._viewKey(); if (k !== this._key) { this._key = k; const t = this.state.target; this._fly(t.ra, t.dec, this.state.tab === 'target' ? 2.3 : 1); } else this._drawGlobe(); }
+  componentWillUnmount() { clearTimeout(this._t); cancelAnimationFrame(this._raf); removeEventListener('resize', this._onR); if (this._ro) this._ro.disconnect(); }
+  _viewKey() { const s = this.state; return s.target.ra + ',' + s.target.dec + ',' + (s.tab === 'target'); }
+  _loop() {
+    this._t = setTimeout(() => {
+      const s = this.state, N = this.FR.length;
+      if (s.blinking) this.setState({ side: s.side === 'a' ? 'b' : 'a' });
+      else if (s.playing) { const n = s.frame + 1; if (n < N) this.setState({ frame: n }); else this.setState(s.tog.loop ? { frame: 0 } : { playing: false }); }
+      this._loop();
+    }, 1000 / this.state.speed);
+  }
+  _rng(seed) { return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296; }
+  _gen() {
+    const S = 420, r = this._rng(7), stars = [];
+    for (let i = 0; i < 140; i++) stars.push([r() * S, r() * S, Math.pow(r(), 6) * 3.4 + 0.5, r() * 0.7 + 0.3]);
+    this._frames = this.FR.map((f, i) => {
+      const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), n = this._rng(100 + i);
+      x.fillStyle = '#0d0e15'; x.fillRect(0, 0, S, S);
+      for (let k = 0; k < 2600; k++) { x.fillStyle = 'rgba(200,205,225,' + (n() * 0.09) + ')'; x.fillRect(n() * S, n() * S, 1.5, 1.5); }
+      const dot = (px, py, rad, al) => { const g = x.createRadialGradient(px, py, 0, px, py, rad * 3); g.addColorStop(0, 'rgba(240,240,248,' + al + ')'); g.addColorStop(0.35, 'rgba(220,222,240,' + al * 0.5 + ')'); g.addColorStop(1, 'rgba(220,222,240,0)'); x.fillStyle = g; x.beginPath(); x.arc(px, py, rad * 3, 0, 7); x.fill(); };
+      stars.forEach(s => dot(s[0] + (n() - 0.5) * 0.6, s[1] + (n() - 0.5) * 0.6, s[2], s[3] * (0.9 + n() * 0.1)));
+      dot(S / 2 + (i - 3.5) * 9, S / 2 - (i - 3.5) * 4, 2.3, 0.95);
+      return c.toDataURL('image/jpeg', 0.86);
+    });
+    const layer = (seed, count, max) => { const c = document.createElement('canvas'); c.width = 1100; c.height = 800; const x = c.getContext('2d'), n = this._rng(seed);
+      for (let k = 0; k < count; k++) { const big = Math.pow(n(), 5) * max + 0.4; x.fillStyle = (n() > 0.8 ? 'rgba(210,206,253,' : 'rgba(233,233,237,') + (0.25 + n() * 0.65) + ')'; x.beginPath(); x.arc(n() * 1100, n() * 800, big, 0, 7); x.fill(); }
+      return c.toDataURL('image/png'); };
+    this._far = layer(21, 520, 1.3); this._near = layer(42, 150, 2.4);
+    const g = this._rng(5), ti = 62.9 * Math.PI / 180; this._gstars = [];
+    for (let k = 0; k < 1500; k++) {
+      const lon = g() * 2 * Math.PI, lat = k < 700 ? Math.asin(g() * 2 - 1) : ((g() + g() + g()) / 3 - 0.5) * 0.7;
+      const x0 = Math.cos(lat) * Math.cos(lon), y0 = Math.sin(lat), z0 = Math.cos(lat) * Math.sin(lon);
+      this._gstars.push(k < 700 ? [x0, y0, z0, Math.pow(g(), 4) * 1.5 + 0.4, 0.35 + g() * 0.6] : [x0, y0 * Math.cos(ti) - z0 * Math.sin(ti), y0 * Math.sin(ti) + z0 * Math.cos(ti), g() * 0.7 + 0.3, 0.2 + g() * 0.4]);
+    }
+  }
+  _fmt(iso, short) { const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], p = iso.split('-'); return +p[2] + ' ' + m[+p[1] - 1] + ' ' + (short ? p[0].slice(2) : p[0]); }
+  _num(v, isRa) {
+    v = (v || '').trim().replace(/−/g, '-'); if (/^[+-]?\d+(\.\d+)?$/.test(v)) return +v;
+    const m = v.match(/^([+-]?)(\d{1,2})[hd°:\s]+(\d{1,2})[m':\s]+([\d.]+)[s"]?$/i); if (!m) return NaN;
+    return (m[1] === '-' ? -1 : 1) * (+m[2] + m[3] / 60 + m[4] / 3600) * (isRa && /h/i.test(v) ? 15 : 1);
+  }
+  _sel(t, extra) { this.setState(Object.assign({ target: t, err: '', raQ: t.ra.toFixed(3), decQ: t.dec.toFixed(3), nameQ: t.custom ? '' : t.name, frame: 0, playing: false, blinking: false, mode: 'time' }, extra)); }
+  _custom(ra, dec) { return { name: 'Custom sky region', kind: 'No named object here', ra, dec, custom: true }; }
+  _sign(v) { return (v < 0 ? '−' : '+') + Math.abs(v).toFixed(3) + '°'; }
+
+  _proj(v) { const cl = Math.cos(this._gl), sl = Math.sin(this._gl), ct = Math.cos(this._gt), st = Math.sin(this._gt); const x = v[0] * cl + v[2] * sl, z = -v[0] * sl + v[2] * cl; return [x, v[1] * ct - z * st, v[1] * st + z * ct]; }
+  _vec(ra, dec) { const a = ra * Math.PI / 180, d = dec * Math.PI / 180; return [Math.cos(d) * Math.cos(a), Math.sin(d), Math.cos(d) * Math.sin(a)]; }
+  _geo(c) { const w = c.clientWidth, h = c.clientHeight; return { w, h, R: Math.min(w, h) * 0.38 * this._gz, cx: w / 2, cy: h / 2 + 14 }; }
+  _drawGlobe() {
+    const c = this._gref && this._gref.current; if (!c || !this._gstars || !c.clientWidth || !c.clientHeight) return;
+    const G = this._geo(c), d = Math.min(2, window.devicePixelRatio || 1), R = G.R, cx = G.cx, cy = G.cy;
+    if (c.width !== Math.round(G.w * d) || c.height !== Math.round(G.h * d)) { c.width = Math.round(G.w * d); c.height = Math.round(G.h * d); }
+    const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, G.w, G.h);
+    const P = v => { const p = this._proj(v); return [cx + R * p[0], cy - R * p[1], p[2]]; };
+    const halo = x.createRadialGradient(cx, cy, R, cx, cy, R * 1.14); halo.addColorStop(0, 'rgba(145,132,217,.22)'); halo.addColorStop(1, 'rgba(145,132,217,0)');
+    x.fillStyle = halo; x.beginPath(); x.arc(cx, cy, R * 1.14, 0, 7); x.fill();
+    const g = x.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.1, cx, cy, R); g.addColorStop(0, '#353b80'); g.addColorStop(0.55, '#262a60'); g.addColorStop(1, '#161826');
+    x.fillStyle = '#161826'; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill(); x.globalAlpha = 0.7; x.fillStyle = g; x.fill(); x.globalAlpha = 1;
+    x.save(); x.beginPath(); x.arc(cx, cy, R, 0, 7); x.clip(); x.lineWidth = 1;
+    const seg = pts => { for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; if (a[2] <= 0 && b[2] <= 0) continue; x.strokeStyle = 'rgba(181,171,252,.24)'; x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); } };
+    for (let ra = 0; ra < 360; ra += 30) { const pts = []; for (let dd = -90; dd <= 90; dd += 5) pts.push(P(this._vec(ra, dd))); seg(pts); }
+    for (let dd = -60; dd <= 60; dd += 30) { const pts = []; for (let ra = 0; ra <= 360; ra += 5) pts.push(P(this._vec(ra, dd))); seg(pts); }
+    for (const s of this._gstars) { const p = P(s); if (p[2] <= 0) continue; x.fillStyle = 'rgba(233,233,237,' + s[4] + ')'; x.beginPath(); x.arc(p[0], p[1], s[3] * Math.sqrt(this._gz), 0, 7); x.fill(); }
+    x.restore();
+    x.strokeStyle = 'rgba(181,171,252,.85)'; x.lineWidth = 1.5; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.stroke();
+    const sel = this.state.target; x.font = '500 11px Inter, sans-serif';
+    this._pins = this.TARGETS.map(t => { const p = P(this._vec(t.ra, t.dec)); if (p[2] > 0.05) { x.fillStyle = '#b5abfc'; x.beginPath(); x.arc(p[0], p[1], 4, 0, 7); x.fill(); x.strokeStyle = 'rgba(181,171,252,.4)'; x.lineWidth = 1; x.beginPath(); x.arc(p[0], p[1], 8, 0, 7); x.stroke(); if (t !== sel) { x.fillStyle = '#cfd3e5'; x.fillText(t.name, p[0] + 13, p[1] + 4); } } return [p, t]; });
+    const p = P(this._vec(sel.ra, sel.dec));
+    if (p[2] > 0) {
+      const k = Math.max(0, Math.min(1, (this._gz - 1.3) / 0.8));
+      if (k > 0) { x.globalAlpha = k; x.strokeStyle = '#d2cefd'; x.lineWidth = 1; x.setLineDash([4, 4]); x.strokeRect(p[0] - 44, p[1] - 44, 88, 88); x.setLineDash([]); x.fillStyle = '#cfd3e5'; x.fillText('Image area', p[0] - 44, p[1] + 60); x.globalAlpha = 1; }
+      x.strokeStyle = '#f5f4ff'; x.lineWidth = 1.5; x.beginPath(); x.arc(p[0], p[1], 13, 0, 7); x.moveTo(p[0] - 24, p[1]); x.lineTo(p[0] - 13, p[1]); x.moveTo(p[0] + 13, p[1]); x.lineTo(p[0] + 24, p[1]); x.moveTo(p[0], p[1] - 24); x.lineTo(p[0], p[1] - 13); x.moveTo(p[0], p[1] + 13); x.lineTo(p[0], p[1] + 24); x.stroke();
+      x.fillStyle = '#f5f4ff'; x.fillText(sel.name, p[0] + 30, p[1] - 2); x.fillStyle = '#b5abfc'; x.font = '500 9px Inter, sans-serif'; x.fillText('SELECTED', p[0] + 30, p[1] + 11);
+    }
+    if (this._rref && this._rref.current) { const ra = ((this._gl * 180 / Math.PI + 90) % 360 + 360) % 360; this._rref.current.textContent = 'View centre  RA ' + ra.toFixed(0) + '°  Dec ' + this._sign(this._gt * 180 / Math.PI).replace('.000', ''); }
+  }
+  _fly(ra, dec, z) {
+    cancelAnimationFrame(this._raf); const l0 = this._gl, t0 = this._gt, z0 = this._gz, t1 = dec * Math.PI / 180; let dl = ((ra - 90) * Math.PI / 180 - l0) % (2 * Math.PI); if (dl > Math.PI) dl -= 2 * Math.PI; if (dl < -Math.PI) dl += 2 * Math.PI;
+    const st = performance.now(), step = now => { const k = Math.min(1, (now - st) / 900), e = 1 - Math.pow(1 - k, 3); this._gl = l0 + dl * e; this._gt = t0 + (t1 - t0) * e; this._gz = z0 + (z - z0) * e; this._drawGlobe(); if (k < 1) this._raf = requestAnimationFrame(step); };
+    this._raf = requestAnimationFrame(step);
+  }
+  _zoom(f) { cancelAnimationFrame(this._raf); this._gz = Math.max(0.7, Math.min(4, this._gz * f)); this._drawGlobe(); }
+  globeDown = e => {
+    cancelAnimationFrame(this._raf);
+    const c = this._gref.current, sx = e.clientX, sy = e.clientY, l0 = this._gl, t0 = this._gt; let moved = 0;
+    const mv = ev => { const dx = ev.clientX - sx, dy = ev.clientY - sy; moved = Math.max(moved, Math.abs(dx) + Math.abs(dy)); this._gl = l0 - dx * 0.006 / this._gz; this._gt = Math.max(-1.45, Math.min(1.45, t0 + dy * 0.006 / this._gz)); this._drawGlobe(); };
+    const up = ev => {
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved > 5) return;
+      const r = c.getBoundingClientRect(), G = this._geo(c), px = ev.clientX - r.left, py = ev.clientY - r.top;
+      const hit = (this._pins || []).find(p => p[0][2] > 0 && Math.hypot(p[0][0] - px, p[0][1] - py) < 16);
+      if (hit) return this._sel(hit[1], { tab: 'target' });
+      const x = (px - G.cx) / G.R, y2 = -(py - G.cy) / G.R, d = 1 - x * x - y2 * y2; if (d < 0) return;
+      const z2 = Math.sqrt(d), ct = Math.cos(this._gt), st = Math.sin(this._gt), y = y2 * ct + z2 * st, z = -y2 * st + z2 * ct, cl = Math.cos(this._gl), sl = Math.sin(this._gl);
+      const ra = (Math.atan2(x * sl + z * cl, x * cl - z * sl) * 180 / Math.PI + 360) % 360, dec = Math.asin(Math.max(-1, Math.min(1, y))) * 180 / Math.PI;
+      this._sel(this._custom(+ra.toFixed(3), +dec.toFixed(3)), { tab: 'target' });
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up);
+  };
+  dragStart = e => {
+    if (e.target.closest('button,label,input,a')) return;
+    const sx = e.clientX, sy = e.clientY, o = this.state.orbit, t = this.state.tilt;
+    const mv = ev => this.setState({ orbit: Math.max(-40, Math.min(40, o + (ev.clientX - sx) * 0.25)), tilt: Math.max(-30, Math.min(30, t - (ev.clientY - sy) * 0.25)) });
+    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up);
+  };
+  find = () => { const q = this.state.nameQ.trim().toLowerCase(), t = q.length >= 3 && this.TARGETS.find(t => t.name.toLowerCase().startsWith(q)); if (t) this._sel(t); else this.setState({ err: "We couldn't find that name. Try coordinates instead." }); };
+  locate = () => { const ra = this._num(this.state.raQ, true), dec = this._num(this.state.decQ); if (ra >= 0 && ra < 360 && Math.abs(dec) <= 90) this._sel(this._custom(ra, dec)); else this.setState({ err: "We couldn't read those coordinates. Try 133.795 and -7.245." }); };
+  _assign(k, i, extra) { this.setState(s => { const o = k === 'a' ? 'b' : 'a', u = Object.assign({ [k]: i }, extra); if (s[o] === i) u[o] = s[k]; return u; }); }
+  _tog(k) { this.setState(s => ({ tog: Object.assign({}, s.tog, { [k]: !s.tog[k] }) })); }
+
+  renderVals() {
+    if (!this._frames) this._gen();
+    if (!this._gref) { this._gref = React.createRef(); this._rref = React.createRef(); }
+    const s = this.state, N = this.FR.length, blinkMode = s.mode === 'blink', cur = blinkMode ? s[s.side] : s.frame, tgt = s.target, deep = s.tab === 'target', sky = deep || s.tab === 'explore';
+    const days = Math.abs(Math.round((new Date(this.FR[s.b].iso) - new Date(this.FR[s.a].iso)) / 864e5));
+    const edge = on => on ? 'var(--color-accent-400)' : 'var(--color-divider)', show = (on, v) => on ? (v || 'flex') : 'none';
+    const go = tab => () => this.setState({ tab });
+    const ticks = this.FR.map((f, i) => {
+      const isA = i === s.a, isB = i === s.b, on = i === cur;
+      return { date: this._fmt(f.iso), short: this._fmt(f.iso, true),
+        go: () => blinkMode ? this._assign(s.pick, i, { side: s.pick }) : this.setState({ frame: i, playing: false }),
+        badge: isA ? 'A' : isB ? 'B' : '', badgeVis: isA || isB ? 'visible' : 'hidden',
+        bar: on ? 'var(--color-accent-400)' : isA || isB ? 'var(--color-accent-700)' : 'var(--color-neutral-700)',
+        ink: on ? 'var(--color-text)' : 'var(--color-neutral-400)', gap: f.p && i ? '16px' : '0px' };
+    });
+    const T = this.TARGETS, fr = this._frames;
+    return {
+      yes: true, noop: () => {},
+      navTabs: [['explore', 'Explore'], ['target', 'Target'], ['hub', 'Research hub'], ['feed', 'Sky feed'], ['learn', 'Learn'], ['about', 'About']].map(t => ({ name: t[1], go: go(t[0]), mark: s.tab === t[0] ? 'var(--color-accent)' : 'transparent', ink: s.tab === t[0] ? 'var(--color-text)' : 'var(--color-neutral-400)' })),
+      skyDisp: show(sky), hubDisp: show(s.tab === 'hub', 'block'), feedDisp: show(s.tab === 'feed', 'block'), learnDisp: show(s.tab === 'learn', 'block'), aboutDisp: show(s.tab === 'about', 'block'),
+      railDisp: show(!deep && !s.narrow), compactDisp: show(!deep), deepDisp: show(deep), backDisp: show(deep, 'inline-flex'),
+      panelW: deep ? 'min(640px, 60%)' : '340px',
+      nameQ: s.nameQ, raQ: s.raQ, decQ: s.decQ, err: s.err,
+      onName: e => this.setState({ nameQ: e.target.value }), onRa: e => this.setState({ raQ: e.target.value }), onDec: e => this.setState({ decQ: e.target.value }),
+      nameKey: e => { if (e.key === 'Enter') this.find(); }, coordKey: e => { if (e.key === 'Enter') this.locate(); }, find: this.find, locate: this.locate,
+      examples: T.map(t => ({ name: t.name, kind: t.kind, go: () => this._sel(t), edge: t === tgt ? 'var(--color-accent-400)' : 'transparent' })),
+      globeRef: this._gref, readRef: this._rref, globeDown: this.globeDown,
+      globeKicker: deep ? 'Target view' : 'Explore · whole sky', globeTitle: deep ? 'Zoomed in on ' + tgt.name : 'A changing sky, one region at a time',
+      toExplore: go('explore'), toTarget: go('target'), zoomIn: () => this._zoom(1.3), zoomOut: () => this._zoom(1 / 1.3),
+      copyLink: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1500); }, copyLabel: s.copied ? 'Link copied' : 'Copy view link',
+      shareFeed: () => { this.setState({ shared: true }); setTimeout(() => this.setState({ shared: false }), 1500); }, shareLabel: s.shared ? 'Shared (mockup)' : 'Share',
+      tName: tgt.name, tKind: tgt.kind, tRa: tgt.ra.toFixed(3) + '°', tDec: this._sign(tgt.dec), tCoords: 'RA ' + tgt.ra.toFixed(3) + '° · Dec ' + this._sign(tgt.dec),
+      starsFar: this._far, starsNear: this._near, curSrc: fr[cur], curDate: this._fmt(this.FR[cur].iso), curNum: cur + 1,
+      stageT: 'rotateX(' + s.tilt + 'deg) rotateY(' + s.orbit + 'deg)', dragStart: this.dragStart, resetView: () => this.setState({ orbit: 0, tilt: 0 }),
+      crossDisp: show(s.tog.crosshair, 'block'), arrowDisp: show(s.tog.arrow, 'block'),
+      sideDisp: show(blinkMode, 'inline-flex'), sideLabel: s.side.toUpperCase(),
+      isTime: !blinkMode, isBlink: blinkMode, timeDisp: show(!blinkMode), blinkDisp: show(blinkMode),
+      toTime: () => this.setState({ mode: 'time', blinking: false, frame: cur }), toBlink: () => this.setState({ mode: 'blink', playing: false }),
+      togglePlay: () => this.setState({ playing: !s.playing, mode: 'time', blinking: false }), playIcon: s.playing ? 'ph-fill ph-pause' : 'ph-fill ph-play',
+      stepBack: () => this.setState({ frame: (s.frame + N - 1) % N, playing: false }), stepFwd: () => this.setState({ frame: (s.frame + 1) % N, playing: false }),
+      toggleBlink: () => this.setState(s.blinking ? { blinking: false } : { blinking: true, mode: 'blink', playing: false }),
+      blinkLabel: s.blinking ? 'Stop blinking' : 'Blink A ⇄ B',
+      blinkBg: s.blinking ? 'var(--color-accent-800)' : 'transparent', blinkGlow: s.blinking ? '0 0 26px color-mix(in srgb, var(--color-accent) 50%, transparent)' : 'none',
+      speed: s.speed, speedLabel: s.speed + ' per second', onSpeed: e => this.setState({ speed: +e.target.value }),
+      ticks, scrubHint: blinkMode ? 'Click a date to set image ' + s.pick.toUpperCase() : 'Click a date to jump there',
+      aSrc: fr[s.a], bSrc: fr[s.b], aDate: this._fmt(this.FR[s.a].iso), bDate: this._fmt(this.FR[s.b].iso), gapText: days + ' days apart',
+      aEdge: edge(blinkMode && s.side === 'a'), bEdge: edge(blinkMode && s.side === 'b'),
+      showA: () => this.setState({ mode: 'blink', side: 'a', pick: 'a', blinking: false, playing: false }), showB: () => this.setState({ mode: 'blink', side: 'b', pick: 'b', blinking: false, playing: false }),
+      pickA: () => this.setState({ pick: 'a', side: 'a' }), pickB: () => this.setState({ pick: 'b', side: 'b' }), pickAEdge: edge(s.pick === 'a'), pickBEdge: edge(s.pick === 'b'),
+      setA: () => this._assign('a', cur), setB: () => this._assign('b', cur),
+      blinkPreview: fr[s[s.side]],
+      tabs: ['Blink', 'Data', 'Coming next'].map(n => ({ name: n, go: () => this.setState({ ptab: n }), mark: s.ptab === n ? 'var(--color-accent)' : 'transparent', ink: s.ptab === n ? 'var(--color-text)' : 'var(--color-neutral-400)' })),
+      blinkTabDisp: show(s.ptab === 'Blink'), dataTabDisp: show(s.ptab === 'Data', 'block'), nextTabDisp: show(s.ptab === 'Coming next'),
+      toggles: [['crosshair', 'Crosshair'], ['arrow', 'Path arrow'], ['loop', 'Loop']].map(t => ({ label: t[1], toggle: () => this._tog(t[0]), edge: edge(s.tog[t[0]]), ink: s.tog[t[0]] ? 'var(--color-accent-300)' : 'var(--color-text)' })),
+      rows: this.FR.map((f, i) => ({ date: this._fmt(f.iso), visit: i < 3 ? 'May 2025' : i < 5 ? 'Nov 2025' : 'May 2026' })),
+      hubCount: (s.hub + 1) + ' of ' + this.HUB.length, hubName: this.HUB[s.hub][0], hubGuess: this.HUB[s.hub][1], hubMsg: s.hubMsg, look1: fr[1], look2: fr[4], look3: fr[6],
+      vote: () => this.setState({ hub: (s.hub + 1) % this.HUB.length, hubMsg: 'Vote recorded (mockup). Here is the next one.' }),
+      board: this.HUB.map(h => ({ name: h[0], guess: h[1].replace(', likely', ''), votes: 'placeholder' })),
+      sorts: ['Trending', 'New', 'Nearby'].map(n => ({ name: n, on: s.sort === n, go: () => this.setState({ sort: n }) })),
+      posts: [[0, 'MK', 'skywatcher_mk', 'Candidate mover', 'Watch the dot near the centre between May and November.', 12], [1, 'JR', 'jr_observes', 'Fast star', 'It really does slide across the field over a year.', 5], [4, 'AL', 'astro_lena', 'Changes brightness', 'Not moving, but compare how bright it is in each visit.', 8]]
+        .map((p, i) => ({ src: fr[(i * 3) % N], initials: p[1], user: p[2], tag: p[3], caption: p[4], comments: p[5], dates: 'May 2025 to May 2026', fly: () => this._sel(T[p[0]], { tab: 'target' }) })),
+      missions: [['Find your first brown dwarf', 'WISE 0855', 'Blink the images, then add an older one to see it jump.', 0], ['Catch an asteroid', 'Eros', 'Two images taken hours apart. Find what slid across.', -1], ['Why does this star blink?', 'R Draconis', "It isn't moving. Its brightness is changing.", 4]]
+        .map((m, i) => ({ n: i + 1, level: 'Beginner', title: m[0], target: m[1], body: m[2], cta: m[3] < 0 ? 'Not in this mockup' : 'Start mission', op: m[3] < 0 ? 0.45 : 1, go: () => { if (m[3] >= 0) this._sel(T[m[3]], { tab: 'target' }); } })),
+      concepts: [['Proper motion', 'Nearby stars drift across the sky over years.'], ['Parallax', 'Close objects seem to shift as Earth orbits the Sun.'], ['Infrared', 'Light our eyes miss. Cool objects glow in it.'], ['Spectra', 'Light split into colors shows what something is made of.'], ['Why blinking works', 'Your eye catches a jump far faster than a difference.']].map(c => ({ name: c[0], body: c[1] }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>
