@@ -19,8 +19,32 @@ conf.remote_timeout = 120
 
 class TAPSession(requests.Session):
     def request(self, method, url, **kwargs):
-        kwargs.setdefault("timeout", (10, 45))
+        kwargs.setdefault("timeout", (10, 120))
         return super().request(method, url, **kwargs)
+
+
+TRANSIENT_STATUS = {502, 503, 504}
+
+
+def is_transient(error: Exception) -> bool:
+    """True for gateway/proxy errors that IRSA usually recovers from quickly."""
+    for candidate in (error, getattr(error, "cause", None), getattr(error, "__cause__", None)):
+        response = getattr(candidate, "response", None)
+        if getattr(response, "status_code", None) in TRANSIENT_STATUS:
+            return True
+    message = str(error)
+    return any(f"{code} " in message or f"HTTP Code: {code}" in message for code in TRANSIENT_STATUS)
+
+
+def with_retries(fn, attempts: int = 6):
+    """Retry IRSA gateway errors with backoff (1, 2, 4, 8, 15s ≈ 30s total)."""
+    for attempt in range(attempts):
+        try:
+            return fn()
+        except (DALServiceError, requests.RequestException) as error:
+            if not is_transient(error) or attempt == attempts - 1:
+                raise
+            time.sleep(min(2**attempt, 15))
 
 
 def parse_footprint(region) -> list[list[float]]:
@@ -87,7 +111,7 @@ def find_images_tap(ra: float, dec: float, size_deg: float, detector: int | None
     ORDER BY p.time_bounds_lower
     """
     service = TAPService(Irsa.tap_url, session=TAPSession())
-    rows = service.run_sync(query, language="ADQL").to_table()
+    rows = with_retries(lambda: service.run_sync(query, language="ADQL")).to_table()
     rows.meta["discovery_source"] = "TAP"
     return rows
 
@@ -99,19 +123,12 @@ def find_images_sia(
     detector: int | None,
     coord: SkyCoord,
 ):
-    for attempt in range(4):
-        try:
-            rows = Irsa.query_sia(
-                pos=(coord, 1 * u.arcsec),
-                collection=["spherex_dr1", "spherex_dr1_deep", "spherex_qr3", "spherex_qr3_deep"],
-            )
-            break
-        except DALServiceError as error:
-            cause = getattr(error, "cause", None)
-            response = getattr(cause, "response", None)
-            if getattr(response, "status_code", None) not in {502, 503, 504} or attempt == 3:
-                raise
-            time.sleep(min(2**attempt, 8))
+    rows = with_retries(
+        lambda: Irsa.query_sia(
+            pos=(coord, 1 * u.arcsec),
+            collection=["spherex_dr1", "spherex_dr1_deep", "spherex_qr3", "spherex_qr3_deep"],
+        )
+    )
 
     if detector is not None:
         rows = rows[rows["energy_bandpassname"] == f"SPHEREx-D{detector}"]
