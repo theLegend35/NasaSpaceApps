@@ -1,0 +1,9 @@
+astropy
+astroquery
+fastapi
+numpy
+Pillow
+pyvo
+redis>=5.0
+requests
+uvicorn[standard]

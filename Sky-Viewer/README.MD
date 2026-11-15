@@ -1,25 +1,41 @@
-# SPHEREx Sky Viewer — Design Mockups
+# SPHEREx Sky Viewer
 
-UI mockups for a public-facing web tool that shows images of the sky from NASA's SPHEREx mission and plays them back like a short video, so anyone can see how a patch of sky changes over time.
+Next.js interface and FastAPI lookup service for SPHEREx observations available through NASA/IPAC IRSA.
 
-## What the tool does
+## Start the app
 
-1. Enter a patch of sky by **Right Ascension** and **Declination**.
-2. The tool loads every SPHEREx image of that patch, in date order.
-3. Images play as an animation (with play/pause, a frame scrubber and a blink mode), making moving objects and brightness changes easy to spot.
+Use three terminals from the `Sky-Viewer` directory.
 
-## Test targets
+Start Redis in the first terminal:
 
-| Target | Why it's interesting |
-|---|---|
-| Barnard's Star | High proper motion — visibly moves between frames |
-| Epsilon Indi B | A pair of brown dwarfs orbiting a star |
-| WISE 0855 (RA 08h55m10.831s, Dec −7°14′42.53″) | Fast-moving brown dwarf |
-| RW Aurigae | Variable star — brightness changes |
-| R Draconis | Variable star — brightness changes |
+```sh
+redis-server --bind 127.0.0.1 --port 6379 --dir /tmp --dbfilename spherex-redis.rdb --appendonly yes --appendfilename spherex-redis.aof
+```
 
-## Status
+Install and start the API in the second terminal:
 
-These are **design mockups with sample data**, not the working tool yet. Open `index.html` in a browser to view them (it's a single self-contained file; JavaScript must be enabled).
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+uvicorn backend.lookup:app --reload
+```
 
-Next step: build the real viewer and connect it to actual SPHEREx image cutouts.
+Install and start the Next.js app in the third terminal:
+
+```sh
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. The frontend proxies API requests to `http://127.0.0.1:8000`. Set `LOOKUP_API_URL` if the FastAPI server runs at another address.
+
+Redis seeds WISE 0855, Barnard's Star, Epsilon Indi B, RW Aurigae, and R Draconis as selectable targets. Moving-star preset coordinates are propagated to epoch 2025. Redis caches coordinate lookups for 24 hours and image previews for 30 days. Image footprints are returned with each lookup and drawn on both sky views. Set `REDIS_URL` to use another Redis instance.
+
+**Locate in sky** only updates the selected coordinates and checks Redis; it does not contact the archive. Use **Load observations** to run TAP/SIA discovery for a cache miss.
+
+## API
+
+`GET /point?ra=210.80227&dec=54.34895` returns matching observations and per-pixel spectral measurements synchronously. The app uses `POST /point/jobs` followed by `GET /point/jobs/{job_id}` to track long lookups without holding a browser request open. Optional lookup parameters are `size` (cutout size in degrees) and `detector` (1-6).
+
+Image discovery tries IRSA TAP first for the latest ingested observations, with a 45-second request timeout, then falls back to SIA for the DR1 and QR3 wide/deep collections. SIA may lag new data ingestion by about a day; the selected source is shown with the results. The default cutout size is 0.1 degrees to show more spatial context. The app creates an enlarged grayscale preview and overlays the selected coordinate without altering image pixels. A single-band false-color palette is available for viewing contrast, but it does not represent natural RGB colors. The original `index.html` remains the exported design mockup.
