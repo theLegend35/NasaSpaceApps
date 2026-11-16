@@ -387,6 +387,9 @@ body { min-width: 320px; background: var(--night); color: var(--ink); font-famil
 .tv-btn:hover { border-color: var(--violet); }
 .tv-ghost { padding: 4px 6px; border: 0; background: none; color: var(--violet-bright); font-size: 13px; cursor: pointer; }
 .tv-ghost:hover { text-decoration: underline; }
+.tv-how { margin-top: 6px; font-size: 12.5px; color: #c9c7da; }
+.tv-how summary { cursor: pointer; color: var(--violet-bright); }
+.tv-how p { margin: 6px 0 0; line-height: 1.45; }
 .quick-start { margin-top: 10px; font-size: 13px; color: #c9c7da; }
 .quick-start summary { cursor: pointer; color: var(--violet-bright); }
 .quick-start ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.4; }

@@ -200,6 +200,21 @@ export async function classifyLookup(measurements: Measurement[]): Promise<Class
   return await response.json() as Classification;
 }
 
+/** Asks the API for a Gemini-written summary of numbers the app already measured. */
+export async function explainTarget(facts: Record<string, unknown>): Promise<string> {
+  const response = await fetch("/api/explain", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ facts }),
+    cache: "no-store",
+  }).catch(() => null);
+  const payload = await response?.json().catch(() => null);
+  if (!response?.ok || !payload?.text) {
+    throw new Error(payload?.detail ? String(payload.detail) : "The AI summary did not answer. The measured answers above still work.");
+  }
+  return String(payload.text);
+}
+
 export type HorizonsPoint = {
   name: string;
   date: string;

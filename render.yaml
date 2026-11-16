@@ -11,6 +11,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.8"
+      - key: GEMINI_API_KEY
+        sync: false
       - key: MAX_IMAGES
         value: "24"
       - key: LOOKUP_WORKERS

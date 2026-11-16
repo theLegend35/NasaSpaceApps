@@ -377,6 +377,12 @@ export default function TargetView({
           {score.shift_px !== null && <span>Center of light moved {score.shift_px.toFixed(1)} px between the two previews.</span>}
           {score.notes?.map((note) => <small key={note}>{note}</small>)}
           <small>Trained on synthetic cutouts and spectra. These are candidates, not confirmations.</small>
+          <details className="tv-how">
+            <summary>How the two neural networks read this target</summary>
+            <p><strong>BlinkNet</strong> is a convolutional neural network. It takes the earliest and latest picture from one detector, crops a 24 × 24 pixel patch around the target in each, and passes the pair through two convolution layers and two dense layers. Its four outputs are settled, mover, variable and artifact.</p>
+            <p><strong>SpecNet</strong> reads the target&apos;s brightness in the six SPHEREx detectors, from 0.9 to 4.7 µm, and scores star, brown dwarf, galaxy and solar system body. A cold brown dwarf is faint in the short bands and brighter in the long ones.</p>
+            <p>Both were written in NumPy and trained for this project. The pixel shift beside the label is measured separately, so a label that disagrees with the shift gets a warning.</p>
+          </details>
         </div>
       )}
 

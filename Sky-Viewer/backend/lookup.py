@@ -19,6 +19,7 @@ from .cache import (
     seed_known_targets,
 )
 from .catalogs import catalogs, resolve_name
+from .explain import explain
 from .horizons import path, predict
 from .nets import classify_measurements, ensure_trained
 from .seed import load_seed
@@ -45,6 +46,43 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "P
 
 class ClassifyBody(BaseModel):
     measurements: list[dict]
+
+
+class ExplainBody(BaseModel):
+    facts: dict
+
+
+@app.post("/explain")
+def explain(body: ExplainBody):
+    """Ask Gemini to put this target's measurements into plain words. The key stays in the server environment."""
+    import json
+    import os
+
+    import requests
+
+    key = os.getenv("GEMINI_API_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="No language model key is set on this server")
+    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+    prompt = (
+        "You explain infrared sky measurements from NASA's SPHEREx telescope to a curious visitor. "
+        "Use only the facts in the JSON below. Add no objects, numbers or discoveries that are missing from it. "
+        "The two network reads are candidates from small networks trained on synthetic examples, so say that plainly. "
+        "Write three short sentences in plain words.\n\n" + json.dumps(body.facts)[:6000]
+    )
+    try:
+        response = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            headers={"x-goog-api-key": key},
+            json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.2}},
+            timeout=30,
+        )
+        response.raise_for_status()
+        text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as error:
+        logger.warning("Gemini summary failed: %s", type(error).__name__)
+        raise HTTPException(status_code=502, detail="The language model did not answer") from None
+    return {"text": text.strip(), "model": model}
 
 
 @app.get("/health")
@@ -104,6 +142,21 @@ def classify(body: ClassifyBody):
         if preview:
             previews[url] = preview
     return classify_measurements(body.measurements, previews)
+
+
+class ExplainBody(BaseModel):
+    facts: dict
+
+
+@app.post("/explain")
+def explain_target(body: ExplainBody):
+    try:
+        return {"text": explain(body.facts)}
+    except LookupError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except Exception as error:
+        logger.warning("AI summary failed: %s", type(error).__name__)
+        raise HTTPException(status_code=502, detail="The AI service did not answer.") from error
 
 
 def run_lookup_job(job_id: str, ra: float, dec: float, size: float, detector: int | None):
