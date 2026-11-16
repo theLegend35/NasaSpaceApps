@@ -4,6 +4,14 @@ Next.js interface and FastAPI lookup service for SPHEREx observations available 
 
 For a full description of every feature, the architecture and how the tool covers the challenge brief, see the [project write-up (PDF)](docs/Sky-Timeline-Writeup.pdf).
 
+## Live
+
+- Site: https://sky-timeline-spherex.netlify.app (Netlify, built from this folder with `netlify.toml`)
+- API: https://thelegend35-sky-viewer-api.onrender.com (Render, from `render.yaml` at the repo root)
+- Demo slides: https://sky-timeline-spherex.netlify.app/Sky-Timeline-Slidedeck.pdf
+
+Saved targets ship with the site as static files copied from `cache-seed/` by `scripts/seed-static.mjs`, so they open without the API or Redis. Redis is optional. Set `GEMINI_API_KEY` on the API host to switch on the "Explain with AI" summary.
+
 ## Start the app
 
 Use three terminals from the `Sky-Viewer` directory.
@@ -68,4 +76,4 @@ To load the seed into Redis without restarting the API, run `python -m backend.s
 
 `GET /point?ra=210.80227&dec=54.34895` returns matching observations and per-pixel spectral measurements synchronously. The app uses `POST /point/jobs` followed by `GET /point/jobs/{job_id}` to track long lookups without holding a browser request open. Optional lookup parameters are `size` (cutout size in degrees) and `detector` (1-6).
 
-Image discovery tries IRSA TAP first for the latest ingested observations, with a 45-second request timeout, then falls back to SIA for the DR1 and QR3 wide/deep collections. SIA may lag new data ingestion by about a day; the selected source is shown with the results. The default cutout size is 0.1 degrees to show more spatial context. The app creates an enlarged grayscale preview and overlays the selected coordinate without altering image pixels. A single-band false-color palette is available for viewing contrast, but it does not represent natural RGB colors. The original `index.html` remains the exported design mockup.
+Image discovery tries IRSA TAP first for the latest ingested observations, with a 45-second request timeout, then falls back to SIA for the DR1 and QR3 wide/deep collections. SIA may lag new data ingestion by about a day; the selected source is shown with the results. The default cutout size is 0.1 degrees to show more spatial context. The app creates an enlarged grayscale preview and overlays the selected coordinate without altering image pixels. A single-band false-color palette is available for viewing contrast, but it does not represent natural RGB colors.
