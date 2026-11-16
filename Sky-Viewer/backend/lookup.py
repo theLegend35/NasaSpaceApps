@@ -17,6 +17,7 @@ from .cache import (
     read_cached_lookup,
     seed_known_targets,
 )
+from .seed import load_seed
 from .service import lookup
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ jobs_lock = threading.Lock()
 @asynccontextmanager
 async def lifespan(_app):
     seed_known_targets()
+    loaded = load_seed()
+    if any(loaded.values()):
+        logger.info("Loaded cache seed into Redis: %s", loaded)
     yield
 
 

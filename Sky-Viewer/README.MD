@@ -32,6 +32,18 @@ Open http://localhost:3000. The frontend proxies API requests to `http://127.0.0
 
 Redis seeds WISE 0855, Barnard's Star, Epsilon Indi B, RW Aurigae, and R Draconis as selectable targets. Moving-star preset coordinates are propagated to epoch 2025. Redis caches coordinate lookups for 24 hours and image previews for 30 days. Image footprints are returned with each lookup and drawn on both sky views. Set `REDIS_URL` to use another Redis instance.
 
+### Shared cache
+
+`cache-seed/` holds cached lookups (`lookups/*.json`) and image previews (`previews/*.png`) exported from Redis. The API loads them into Redis when it starts, so points someone has already loaded open immediately for everyone, without querying IRSA. Seeded entries have no expiry, and keys already in Redis are never overwritten.
+
+After loading new points, export them so they can be committed:
+
+```sh
+python -m backend.seed export
+```
+
+To load the seed into Redis without restarting the API, run `python -m backend.seed load`.
+
 **Locate in sky** only updates the selected coordinates and checks Redis; it does not contact the archive. Use **Load observations** to run TAP/SIA discovery for a cache miss.
 
 ## API
