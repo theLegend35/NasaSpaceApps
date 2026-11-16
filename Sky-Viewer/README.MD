@@ -2,6 +2,8 @@
 
 Next.js interface and FastAPI lookup service for SPHEREx observations available through NASA/IPAC IRSA.
 
+For a full description of every feature, the architecture and how the tool covers the challenge brief, see the [project write-up (PDF)](docs/Sky-Timeline-Writeup.pdf).
+
 ## Start the app
 
 Use three terminals from the `Sky-Viewer` directory.
