@@ -50,6 +50,15 @@ export default function TargetSidebar({
       <div className="sidebar-intro">
         <h2>Pick a spot.<br />Watch it change.</h2>
         <p>Search for an object or enter a position. Then watch real observations over time.</p>
+        <details className="quick-start">
+          <summary>First visit? Four moves</summary>
+          <ol>
+            <li>Tap an example target below. Its images are saved with the site and open at once.</li>
+            <li>Press play. Each frame is one SPHEREx pass over that patch, in date order.</li>
+            <li>Switch to Blink or Heatmap. A star that travelled shows as a jump, or a red and blue pair.</li>
+            <li>Try your own patch: click the globe, or type a name or a position such as 17:57:48.5 +04:41:36.</li>
+          </ol>
+        </details>
       </div>
 
       <form className="target-search" onSubmit={onSearchKnownTarget}>
@@ -94,7 +103,7 @@ export default function TargetSidebar({
           </button>
         </div>
       </form>
-      <p className="coordinate-hint">Enter coordinates in decimal degrees.</p>
+      <p className="coordinate-hint">Enter coordinates in decimal degrees. A new patch asks the NASA archive live, which can take a minute or two; saved targets open at once.</p>
       {statusMessage && <p className="action-message" role="status">{statusMessage}</p>}
 
       <section className="example-targets" aria-label="Example targets">

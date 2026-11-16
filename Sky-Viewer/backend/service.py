@@ -1,4 +1,5 @@
 import concurrent.futures
+import os
 from collections.abc import Callable
 
 import astropy.units as u
@@ -6,6 +7,9 @@ from astropy.coordinates import SkyCoord
 
 from .archive import find_images, measure, parse_footprint
 from .cache import read_cached_lookup, lookup_cache_key, store_previews, write_cached_lookup
+
+MAX_IMAGES = int(os.getenv("MAX_IMAGES", "0") or 0)
+LOOKUP_WORKERS = max(1, int(os.getenv("LOOKUP_WORKERS", "8") or 8))
 
 
 def lookup(
@@ -33,10 +37,16 @@ def lookup(
             if len(polygon) >= 3 and key not in seen_footprints:
                 seen_footprints.add(key)
                 footprints.append(polygon)
+    # A small host can cap the work: MAX_IMAGES keeps an even spread of the images that were found.
+    if 0 < MAX_IMAGES < total:
+        step = (total - 1) / (MAX_IMAGES - 1) if MAX_IMAGES > 1 else 0
+        rows = rows[sorted({round(index * step) for index in range(MAX_IMAGES)})]
+    found = total
+    total = len(rows)
     if on_progress:
         on_progress(0, total)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=LOOKUP_WORKERS) as pool:
         futures = [pool.submit(measure, row, coord) for row in rows]
         results = []
         for completed, future in enumerate(concurrent.futures.as_completed(futures), start=1):
@@ -56,7 +66,7 @@ def lookup(
         "ra": ra,
         "dec": dec,
         "discovery_source": rows.meta.get("discovery_source", "unknown"),
-        "images_found": len(rows),
+        "images_found": found,
         "images_measured": len(measurements),
         "measurements": measurements,
         "footprints": footprints,

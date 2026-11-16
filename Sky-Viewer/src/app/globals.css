@@ -387,6 +387,9 @@ body { min-width: 320px; background: var(--night); color: var(--ink); font-famil
 .tv-btn:hover { border-color: var(--violet); }
 .tv-ghost { padding: 4px 6px; border: 0; background: none; color: var(--violet-bright); font-size: 13px; cursor: pointer; }
 .tv-ghost:hover { text-decoration: underline; }
+.quick-start { margin-top: 10px; font-size: 13px; color: #c9c7da; }
+.quick-start summary { cursor: pointer; color: var(--violet-bright); }
+.quick-start ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.4; }
 .tv-keep { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12px; }
 .tv-keep .tv-ghost { display: inline-flex; align-items: center; gap: 5px; }
 .tv-keep .tv-ghost.is-on { color: #ffd166; }
