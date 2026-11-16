@@ -5,8 +5,19 @@ import { ArrowLeft, Globe, Link2, Map, Minus, Plus } from "lucide-react";
 import ObservationPanel from "../components/ObservationPanel";
 import TargetSidebar from "../components/TargetSidebar";
 import TargetView from "../components/TargetView";
+import { About, Learn, ResearchHub, SkyFeed } from "../components/SiteSections";
 import { fetchCachedLookup, fetchKnownTargets, loadObservations, type KnownTarget, type LookupJobStatus, type LookupResponse } from "../lib/spherex";
 import SkyGlobe, { SkyMap } from "./SkyGlobe";
+
+const NAV_ITEMS = [
+  { id: "explore", label: "Explore" },
+  { id: "target", label: "Target" },
+  { id: "hub", label: "Research hub" },
+  { id: "feed", label: "Sky feed" },
+  { id: "learn", label: "Learn" },
+  { id: "about", label: "About" },
+] as const;
+type NavId = (typeof NAV_ITEMS)[number]["id"];
 
 export default function Home() {
   const [ra, setRa] = useState("133.79513");
@@ -20,6 +31,7 @@ export default function Home() {
   const [detector, setDetector] = useState("2");
   const [viewMode, setViewMode] = useState<"globe" | "map">("globe");
   const [targetView, setTargetView] = useState(false);
+  const [section, setSection] = useState<"sky" | "hub" | "feed" | "learn" | "about">("sky");
   const pickRef = useRef(0);
   const [zoom, setZoom] = useState(1);
   const [copied, setCopied] = useState(false);
@@ -48,6 +60,8 @@ export default function Home() {
         const targets = await fetchKnownTargets();
         if (!active) return;
         setKnownTargets(targets);
+        const linked = new URLSearchParams(window.location.search);
+        if (linked.has("ra") && linked.has("dec")) return;
         const defaultTarget = targets.find((target) => target.id === "wise-0855");
         if (!defaultTarget) return;
         setSelectedTargetId(defaultTarget.id);
@@ -72,13 +86,10 @@ export default function Home() {
     const linkedRa = Number(params.get("ra"));
     const linkedDec = Number(params.get("dec"));
     if (Number.isFinite(linkedRa) && Number.isFinite(linkedDec) && params.has("ra") && params.has("dec")) {
-      setRa(linkedRa.toFixed(5));
-      setDec(linkedDec.toFixed(5));
-      setSelectedTargetId("");
-      setTargetName("Selected sky position");
-      setTargetQuery("");
-      setTargetDescription("ICRS sky position");
+      // A shared link opens straight into the target view for that position.
+      void pickSkyPoint(linkedRa, linkedDec);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -122,7 +133,24 @@ export default function Home() {
   function pickTarget(targetId: string) {
     void chooseTarget(targetId);
     setTargetView(true);
+    setSection("sky");
   }
+
+  function goTo(id: NavId) {
+    if (id === "explore" || id === "target") {
+      setSection("sky");
+      setTargetView(id === "target");
+    } else {
+      setSection(id);
+    }
+    window.scrollTo({ top: 0 });
+  }
+
+  const sectionProps = {
+    knownTargets,
+    onOpenTarget: (targetId: string) => { pickTarget(targetId); window.scrollTo({ top: 0 }); },
+    onExplore: () => goTo("explore"),
+  };
 
   function updateCoordinate(axis: "ra" | "dec", value: string) {
     if (axis === "ra") setRa(value);
@@ -258,17 +286,32 @@ export default function Home() {
       <header className="topbar">
         <a className="wordmark" href="#explore" aria-label="Sky Timeline home">Sky Timeline</a>
         <nav className="main-nav" aria-label="Main navigation">
-          <a className="nav-active" href="#explore" aria-current="page">Explore</a>
-          <a href="#target-panel">Target</a>
-          <a href="https://irsa.ipac.caltech.edu/Missions/spherex.html" target="_blank" rel="noreferrer">Research hub</a>
-          <a href="#timeline">Sky feed</a>
-          <a href="https://science.nasa.gov/universe/exoplanets/spherex/" target="_blank" rel="noreferrer">Learn</a>
-          <a href="https://spherex.caltech.edu/" target="_blank" rel="noreferrer">About</a>
+          {NAV_ITEMS.map((item) => {
+            const active = item.id === "explore" ? section === "sky" && !targetView
+              : item.id === "target" ? section === "sky" && targetView
+              : section === item.id;
+            return (
+              <a
+                key={item.id}
+                className={active ? "nav-active" : ""}
+                href={`#${item.id}`}
+                aria-current={active ? "page" : undefined}
+                onClick={(event) => { event.preventDefault(); goTo(item.id); }}
+              >
+                {item.label}
+              </a>
+            );
+          })}
         </nav>
         <div className="data-source"><span className="status-dot" /> SPHEREx · IRSA</div>
       </header>
 
-      <div className={targetView ? "explore-layout is-target" : "explore-layout"}>
+      {section === "hub" && <ResearchHub {...sectionProps} />}
+      {section === "feed" && <SkyFeed {...sectionProps} />}
+      {section === "learn" && <Learn {...sectionProps} />}
+      {section === "about" && <About {...sectionProps} />}
+
+      <div className={targetView ? "explore-layout is-target" : "explore-layout"} hidden={section !== "sky"}>
         {!targetView && <TargetSidebar
           knownTargets={knownTargets}
           selectedTargetId={selectedTargetId}
@@ -288,7 +331,7 @@ export default function Home() {
           onSearchKnownTarget={searchKnownTarget}
           onLocateInSky={locateInSky}
           onLoadObservations={() => void search()}
-          onChooseTarget={(targetId) => void chooseTarget(targetId)}
+          onChooseTarget={pickTarget}
         />}
 
         <section className="sky-stage" id="explore" aria-label="Explore the sky">
