@@ -143,6 +143,23 @@ def find_images_sia(
     return Table(rows=cutouts, names=("uri", "time_bounds_lower", "energy_bandpassname", "footprint"))
 
 
+def compact_wcs(header, shape):
+    if "CD1_1" in header:
+        cd = [
+            [float(header["CD1_1"]), float(header["CD1_2"])],
+            [float(header["CD2_1"]), float(header["CD2_2"])],
+        ]
+    else:
+        cd = [[float(header["CDELT1"]), 0.0], [0.0, float(header["CDELT2"])]]
+    return {
+        "crpix": [float(header["CRPIX1"]), float(header["CRPIX2"])],
+        "crval": [float(header["CRVAL1"]), float(header["CRVAL2"])],
+        "cd": cd,
+        "width": int(shape[1]),
+        "height": int(shape[0]),
+    }
+
+
 def measure(row, coord: SkyCoord):
     """Download one cutout and read its pixel at coord."""
     try:
@@ -165,6 +182,10 @@ def measure(row, coord: SkyCoord):
 
             preview_x = float(np.clip(float(x) / max(image.shape[1] - 1, 1), 0, 1))
             preview_y = float(np.clip(1 - float(y) / max(image.shape[0] - 1, 1), 0, 1))
+            try:
+                wcs = compact_wcs(header, image.shape)
+            except Exception:
+                wcs = None
 
             return {
                 "time_mjd": float(row["time_bounds_lower"]),
@@ -179,6 +200,7 @@ def measure(row, coord: SkyCoord):
                 "_preview_png": preview_png,
                 "preview_x": preview_x,
                 "preview_y": preview_y,
+                "wcs": wcs,
             }
     except Exception:
         return None

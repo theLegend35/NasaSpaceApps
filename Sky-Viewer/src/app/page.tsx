@@ -5,8 +5,10 @@ import { ArrowLeft, Globe, Link2, Map, Minus, Plus } from "lucide-react";
 import ObservationPanel from "../components/ObservationPanel";
 import TargetSidebar from "../components/TargetSidebar";
 import TargetView from "../components/TargetView";
+import { MoverScrubber, MoversPanel } from "../components/SolarSystemMovers";
 import { About, Learn, ResearchHub, SkyFeed } from "../components/SiteSections";
-import { fetchCachedLookup, fetchKnownTargets, loadObservations, type KnownTarget, type LookupJobStatus, type LookupResponse } from "../lib/spherex";
+import { fetchCachedLookup, fetchKnownTargets, loadObservations, resolveName, type KnownTarget, type LookupJobStatus, type LookupResponse } from "../lib/spherex";
+import type { Mover, MoverPath, SkyPath } from "../lib/movers";
 import SkyGlobe, { SkyMap } from "./SkyGlobe";
 
 const NAV_ITEMS = [
@@ -45,6 +47,10 @@ export default function Home() {
   const [statusMessage, setStatusMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<LookupJobStatus | null>(null);
+  const [mover, setMover] = useState<{ mover: Mover; path: MoverPath } | null>(null);
+  const [moverDay, setMoverDay] = useState(0);
+  const [moverRequest, setMoverRequest] = useState<{ command: string; nonce: number } | null>(null);
+  const skyPath: SkyPath | null = mover ? { name: mover.mover.name, points: mover.path.points, active: moverDay } : null;
   const timelineLength = result?.measurements.length ?? 0;
   const raNumber = Number.parseFloat(ra) || 0;
   const decNumber = Number.parseFloat(dec) || 0;
@@ -87,7 +93,11 @@ export default function Home() {
     const linkedDec = Number(params.get("dec"));
     if (Number.isFinite(linkedRa) && Number.isFinite(linkedDec) && params.has("ra") && params.has("dec")) {
       // A shared link opens straight into the target view for that position.
-      void pickSkyPoint(linkedRa, linkedDec);
+      // A link that lands on a saved target uses that target's exact position, so its saved images open at once.
+      void fetchKnownTargets().catch(() => [] as KnownTarget[]).then((targets) => {
+        const near = targets.find((target) => Math.abs(target.ra - linkedRa) < 0.002 && Math.abs(target.dec - linkedDec) < 0.002);
+        void pickSkyPoint(near?.ra ?? linkedRa, near?.dec ?? linkedDec);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -115,19 +125,69 @@ export default function Home() {
     setStatusMessage("Point selected. Locate in sky checks Redis; load observations queries IRSA.");
   }
 
+  async function runLookup(nextRa: string, nextDec: string, pickId: number) {
+    setError("");
+    setFailedPreview(null);
+    setLoading(true);
+    setStatusMessage("No saved images for this point. Asking IRSA for the SPHEREx cutouts…");
+    try {
+      const job = await loadObservations(nextRa, nextDec, size, detector, setProgress);
+      if (pickId !== pickRef.current) return;
+      if (!job.result) throw new Error("The lookup completed without a result.");
+      setResult(job.result);
+      setCacheHit(Boolean(job.cache_hit || job.result.cache_hit));
+      setFrameIndex(0);
+      setStatusMessage("Loaded SPHEREx images from IRSA.");
+    } catch (caught) {
+      if (pickId !== pickRef.current) return;
+      setError(caught instanceof Error ? caught.message : "Could not reach the lookup service. Check that the FastAPI server is running.");
+    } finally {
+      if (pickId === pickRef.current) {
+        setLoading(false);
+        setProgress(null);
+      }
+    }
+  }
+
+  async function ensureObservations(nextRa: number, nextDec: number) {
+    const pickId = ++pickRef.current;
+    const raText = nextRa.toFixed(5);
+    const decText = nextDec.toFixed(5);
+    setLoading(true);
+    setStatusMessage("Checking saved images…");
+    try {
+      const cached = await fetchCachedLookup(Number(raText), Number(decText), Number(size), detector);
+      if (pickId !== pickRef.current) return;
+      if (cached) {
+        setLoading(false);
+        setResult(cached);
+        setCacheHit(true);
+        setStatusMessage("Loaded this point from the shared cache.");
+        return;
+      }
+      if (detector !== "2" || Number(size) !== 0.1) {
+        const seeded = await fetchCachedLookup(Number(raText), Number(decText), 0.1, "2");
+        if (pickId !== pickRef.current) return;
+        if (seeded) {
+          setLoading(false);
+          setSize("0.1");
+          setDetector("2");
+          setResult(seeded);
+          setCacheHit(true);
+          setStatusMessage("Loaded this point from the shared cache.");
+          return;
+        }
+      }
+    } catch {
+      if (pickId !== pickRef.current) return;
+    }
+    await runLookup(raText, decText, pickId);
+  }
+
   async function pickSkyPoint(nextRa: number, nextDec: number) {
     setSkyPoint(nextRa, nextDec);
     setTargetView(true);
-    const pickId = ++pickRef.current;
-    try {
-      const cached = await fetchCachedLookup(Number(nextRa.toFixed(5)), Number(nextDec.toFixed(5)), Number(size), detector);
-      if (pickId !== pickRef.current || !cached) return;
-      setResult(cached);
-      setCacheHit(true);
-      setStatusMessage("Loaded this point from Redis.");
-    } catch {
-      return;
-    }
+    await ensureObservations(nextRa, nextDec);
   }
 
   function pickTarget(targetId: string) {
@@ -140,6 +200,7 @@ export default function Home() {
     if (id === "explore" || id === "target") {
       setSection("sky");
       setTargetView(id === "target");
+      if (id === "target" && !result) void ensureObservations(raNumber, decNumber);
     } else {
       setSection(id);
     }
@@ -150,7 +211,44 @@ export default function Home() {
     knownTargets,
     onOpenTarget: (targetId: string) => { pickTarget(targetId); window.scrollTo({ top: 0 }); },
     onExplore: () => goTo("explore"),
+    onShowMovers: () => {
+      setSection("sky");
+      setTargetView(false);
+      setMoverRequest({ command: "433;", nonce: Date.now() });
+      window.setTimeout(() => document.getElementById("movers")?.scrollIntoView({ behavior: "smooth" }), 60);
+    },
   };
+
+  function focusMoverDay(name: string, path: MoverPath, day: number) {
+    const point = path.points[day];
+    if (!point) return;
+    setMoverDay(day);
+    setRa(point.ra.toFixed(5));
+    setDec(point.dec.toFixed(5));
+    setSelectedTargetId("");
+    setTargetName(`${name} · ${point.date}`);
+    setTargetQuery(name);
+    setTargetDescription(`Where JPL Horizons places ${name} on ${point.date}, seen from Earth's centre`);
+    setResult(null);
+    setCacheHit(false);
+    setFrameIndex(0);
+    setPlaying(false);
+    setError("");
+  }
+
+  function showMoverPath(next: Mover, path: MoverPath) {
+    setMover({ mover: next, path });
+    focusMoverDay(next.name, path, 0);
+    document.getElementById("explore")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function lookAtMoverDay() {
+    if (!mover) return;
+    const point = mover.path.points[moverDay];
+    setStatusMessage(`SPHEREx images covering ${mover.mover.name}'s position on ${point.date}. Each image has its own date, so the asteroid sits elsewhere in images taken on other days.`);
+    setTargetView(true);
+    void ensureObservations(point.ra, point.dec);
+  }
 
   function updateCoordinate(axis: "ra" | "dec", value: string) {
     if (axis === "ra") setRa(value);
@@ -183,38 +281,44 @@ export default function Home() {
     setFrameIndex(0);
     setPlaying(false);
     setError("");
-    setStatusMessage("");
-    const cached = await fetchCachedLookup(target.ra, target.dec, Number(size), detector);
-    if (cached) {
-      setResult(cached);
-      setCacheHit(true);
-      setStatusMessage("Loaded this target from Redis.");
-      return;
-    }
-    if (!detector) {
-      const cachedDetector = await fetchCachedLookup(target.ra, target.dec, 0.1, "2");
-      if (cachedDetector) {
-        setSize("0.1");
-        setDetector("2");
-        setResult(cachedDetector);
-        setCacheHit(true);
-        setStatusMessage("Loaded this target from Redis using its cached D2 observations.");
-        return;
-      }
-    }
-    setStatusMessage("Target selected. No matching cached result; load observations to query IRSA.");
+    await ensureObservations(target.ra, target.dec);
   }
 
-  function searchKnownTarget(event: FormEvent<HTMLFormElement>) {
+  async function searchKnownTarget(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const query = targetQuery.trim().toLocaleLowerCase();
-    const target = knownTargets.find((candidate) => candidate.name.toLocaleLowerCase() === query)
-      ?? knownTargets.find((candidate) => candidate.name.toLocaleLowerCase().includes(query));
-    if (!target) {
-      setError("No matching saved target. Enter its coordinates below.");
+    const query = targetQuery.trim();
+    const folded = query.toLocaleLowerCase();
+    const target = knownTargets.find((candidate) => candidate.name.toLocaleLowerCase() === folded)
+      ?? knownTargets.find((candidate) => candidate.name.toLocaleLowerCase().includes(folded));
+    if (target) {
+      void chooseTarget(target.id);
+      setTargetView(true);
       return;
     }
-    void chooseTarget(target.id);
+    setError("");
+    setStatusMessage(`Looking up ${query}…`);
+    try {
+      const found = await resolveName(query);
+      if (!found) {
+        setError("No sky position for that name. Enter coordinates instead.");
+        setStatusMessage("");
+        return;
+      }
+      setSelectedTargetId("");
+      setRa(found.ra.toFixed(5));
+      setDec(found.dec.toFixed(5));
+      setTargetName(found.name);
+      setTargetDescription(found.typed ? "Coordinates you typed" : "Name resolved by Sesame");
+      setTargetView(true);
+      setResult(null);
+      setCacheHit(false);
+      setFrameIndex(0);
+      setPlaying(false);
+      await ensureObservations(found.ra, found.dec);
+    } catch {
+      setError("The name service did not answer. Enter coordinates instead.");
+      setStatusMessage("");
+    }
   }
 
   async function locateInSky(event: FormEvent<HTMLFormElement>) {
@@ -230,42 +334,22 @@ export default function Home() {
       if (cached) {
         setResult(cached);
         setCacheHit(true);
-        setStatusMessage("Loaded this point from Redis.");
-      } else {
-        setStatusMessage("Point selected. No cached result yet; load observations to query IRSA.");
+        setStatusMessage("Loaded this point from the shared cache.");
+        return;
       }
     } catch {
-      setStatusMessage("Point selected. Redis is unavailable; load observations to query IRSA.");
+      /* The live lookup below still runs. */
     }
+    await runLookup(ra, dec, ++pickRef.current);
   }
 
   async function search(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    setError("");
-    setStatusMessage("");
     setResult(null);
     setCacheHit(false);
     setFrameIndex(0);
     setPlaying(false);
-    setFailedPreview(null);
-    setLoading(true);
-
-    try {
-      const job = await loadObservations(ra, dec, size, detector, setProgress);
-      if (!job.result) throw new Error("The lookup completed without a result.");
-      setResult(job.result);
-      setCacheHit(Boolean(job.cache_hit || job.result.cache_hit));
-      setFrameIndex(0);
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not reach the lookup service. Check that the FastAPI server is running.",
-      );
-    } finally {
-      setLoading(false);
-      setProgress(null);
-    }
+    await runLookup(ra, dec, ++pickRef.current);
   }
 
   async function copyViewLink() {
@@ -365,19 +449,31 @@ export default function Home() {
                 footprints={footprints}
                 targets={knownTargets}
                 selectedLabel={targetName}
+                path={skyPath}
                 onPick={(nextRa, nextDec) => void pickSkyPoint(nextRa, nextDec)}
                 onPickTarget={pickTarget}
               />
             ) : (
-              <SkyMap ra={raNumber} dec={decNumber} footprints={footprints} onPick={(nextRa, nextDec) => void pickSkyPoint(nextRa, nextDec)} />
+              <SkyMap ra={raNumber} dec={decNumber} footprints={footprints} path={skyPath} onPick={(nextRa, nextDec) => void pickSkyPoint(nextRa, nextDec)} />
             )}
           </div>
 
           <div className="stage-footer">
-            <div className="view-readout">
-              <span>View centre RA {raNumber.toFixed(1)}° · Dec {decNumber >= 0 ? "+" : ""}{decNumber.toFixed(1)}°</span>
-              <span>Illustrative star field · click to select a point</span>
-            </div>
+            {mover && !targetView ? (
+              <MoverScrubber
+                mover={mover.mover}
+                path={mover.path}
+                day={moverDay}
+                onDay={(day) => focusMoverDay(mover.mover.name, mover.path, day)}
+                onLook={lookAtMoverDay}
+                onClose={() => setMover(null)}
+              />
+            ) : (
+              <div className="view-readout">
+                <span>View centre RA {raNumber.toFixed(1)}° · Dec {decNumber >= 0 ? "+" : ""}{decNumber.toFixed(1)}°</span>
+                <span>Illustrative star field · click to select a point</span>
+              </div>
+            )}
             <div className="stage-actions">
               <button type="button" className="copy-link" onClick={copyViewLink}>
                 <Link2 size={16} /> {copied ? "Link copied" : "Copy view link"}
@@ -396,6 +492,7 @@ export default function Home() {
             targetDescription={targetDescription}
             ra={raNumber}
             dec={decNumber}
+            fieldSize={Number(size) || 0.1}
             result={result}
             cacheHit={cacheHit}
             error={error}
@@ -424,6 +521,15 @@ export default function Home() {
         />
         )}
       </div>
+
+      {section === "sky" && !targetView && (
+        <MoversPanel
+          request={moverRequest}
+          active={mover}
+          day={moverDay}
+          onPath={showMoverPath}
+        />
+      )}
     </main>
   );
 }

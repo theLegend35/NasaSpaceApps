@@ -55,6 +55,11 @@ def load_seed(seed_dir: Path = SEED_DIR) -> dict[str, int]:
     if not seed_dir.is_dir():
         return counts
     try:
+        redis_client.ping()
+    except RedisError as error:
+        logger.warning("Redis unavailable while loading cache seed: %s", error)
+        return counts
+    try:
         for folder, prefix, suffix in KINDS:
             files = [path for path in (seed_dir / folder).glob(f"*{suffix}") if DIGEST.match(path.stem)]
             pipe = redis_client.pipeline(transaction=False)
@@ -66,9 +71,36 @@ def load_seed(seed_dir: Path = SEED_DIR) -> dict[str, int]:
     return counts
 
 
+def write_static(seed_dir: Path = SEED_DIR) -> int:
+    """Save the target list and a BlinkNet/SpecNet score for every seeded lookup, for the static site."""
+    import hashlib
+    import json
+
+    from .cache import known_targets
+    from .nets import classify_measurements
+
+    (seed_dir / "targets.json").write_text(json.dumps(known_targets), encoding="utf-8")
+    scores = seed_dir / "scores"
+    scores.mkdir(parents=True, exist_ok=True)
+    written = 0
+    for path in (seed_dir / "lookups").glob("*.json"):
+        measurements = json.loads(path.read_text(encoding="utf-8")).get("measurements", [])
+        previews = {}
+        for item in measurements:
+            url = item.get("cutout_url")
+            png = seed_dir / "previews" / f"{hashlib.sha256(str(url).encode('utf-8')).hexdigest()}.png"
+            if url and png.is_file():
+                previews[url] = png.read_bytes()
+        (scores / path.name).write_text(json.dumps(classify_measurements(measurements, previews)), encoding="utf-8")
+        written += 1
+    return written
+
+
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else ""
-    if command == "export":
+    if command == "static":
+        print(f"Wrote targets.json and {write_static()} scores to {SEED_DIR}")
+    elif command == "export":
         result = export_cache()
         print(f"Exported to {SEED_DIR}: {result['lookups']} new/changed lookups, {result['previews']} new/changed previews")
     elif command == "load":

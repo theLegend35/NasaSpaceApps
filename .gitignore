@@ -8,3 +8,6 @@ __pycache__/
 *.py[cod]
 .venv/
 .envrc
+Sky-Viewer/public/seed/
+Sky-Viewer/AGENTS.md
+.netlify/

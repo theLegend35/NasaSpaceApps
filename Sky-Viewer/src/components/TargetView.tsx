@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, ArrowRight, Link2, Pause, Play, RotateCcw, Share2, SkipBack, SkipForward } from "lucide-react";
-import { formatMjd, formatNumber, type LookupResponse, type Measurement } from "../lib/spherex";
+import { ArrowLeftRight, ArrowRight, Download, Link2, Pause, Play, RotateCcw, Share2, SkipBack, SkipForward, Star } from "lucide-react";
+import HelperChat from "./HelperChat";
+import { classifyLookup, fetchCachedLookup, fetchCatalogs, formatMjd, formatNumber, previewSrc, type CatalogResponse, type Classification, type LookupResponse, type Measurement, type SkyGrid } from "../lib/spherex";
 
 type TargetViewProps = {
   targetName: string;
   targetDescription: string;
   ra: number;
   dec: number;
+  fieldSize: number;
   result: LookupResponse | null;
   cacheHit: boolean;
   error: string;
@@ -18,7 +20,7 @@ type TargetViewProps = {
   onLoadObservations: () => void;
 };
 
-type Tab = "blink" | "spectrum" | "data";
+type Tab = "blink" | "spectrum" | "sources" | "data";
 type Mode = "time" | "blink" | "sub" | "add" | "heat";
 
 const MODES: { id: Mode; label: string; hint: string }[] = [
@@ -32,7 +34,9 @@ const DETECTORS = ["D1", "D2", "D3", "D4", "D5", "D6"];
 const DAY_MS = 86_400_000;
 
 const detectorOf = (m: Measurement) => m.detector.replace(/^SPHEREx-/i, "");
-const previewUrl = (m: Measurement) => `/api/point/image?cutout_url=${encodeURIComponent(m.cutout_url)}`;
+const previewUrl = (m: Measurement) => previewSrc(m.cutout_url);
+const SAVED_KEY = "sky-timeline:saved-spots";
+type SavedSpot = { name: string; ra: number; dec: number };
 const mjdDate = (mjd: number) => new Date((mjd - 40587) * DAY_MS);
 function shortDate(mjd: number) {
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "2-digit" }).format(mjdDate(mjd));
@@ -98,8 +102,27 @@ function useComposite(a: Measurement | undefined, b: Measurement | undefined, mo
   return { src: active ? src : null, failed: active && failed };
 }
 
+function projectSource(grid: SkyGrid, sourceRa: number, sourceDec: number) {
+  const xi = (sourceRa - grid.crval[0]) * Math.cos(grid.crval[1] * Math.PI / 180);
+  const eta = sourceDec - grid.crval[1];
+  const [[a, b], [c, d]] = grid.cd;
+  const det = a * d - b * c;
+  if (Math.abs(det) < 1e-18) return null;
+  const px = grid.crpix[0] + (d * xi - b * eta) / det;
+  const py = grid.crpix[1] + (-c * xi + a * eta) / det;
+  const x = (px - 1) / Math.max(grid.width - 1, 1);
+  const y = 1 - (py - 1) / Math.max(grid.height - 1, 1);
+  if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+  return { x, y };
+}
+
+function scoreLine(title: string, label: string | undefined, scores: Record<string, number> | undefined) {
+  if (!label || !scores) return `${title}: not enough images yet`;
+  return `${title}: ${label}, ${Math.round((scores[label] ?? 0) * 100)}%`;
+}
+
 export default function TargetView({
-  targetName, targetDescription, ra, dec, result, cacheHit, error, loading, progressText, statusMessage, onLoadObservations,
+  targetName, targetDescription, ra, dec, fieldSize, result, cacheHit, error, loading, progressText, statusMessage, onLoadObservations,
 }: TargetViewProps) {
   const [tab, setTab] = useState<Tab>("blink");
   const [mode, setMode] = useState<Mode>("time");
@@ -110,11 +133,21 @@ export default function TargetView({
   const [side, setSide] = useState<"a" | "b">("a");
   const [playing, setPlaying] = useState(false);
   const [blinking, setBlinking] = useState(false);
+  const [saved, setSaved] = useState<SavedSpot[]>([]);
+  useEffect(() => {
+    try { setSaved(JSON.parse(window.localStorage.getItem(SAVED_KEY) ?? "[]") as SavedSpot[]); } catch { /* nothing saved yet */ }
+  }, []);
   const [speed, setSpeed] = useState(2);
   const [orbit, setOrbit] = useState(-12);
   const [tilt, setTilt] = useState(8);
   const [copied, setCopied] = useState(false);
   const [brokenSrc, setBrokenSrc] = useState<string | null>(null);
+  const [score, setScore] = useState<Classification | null>(null);
+  const [catalogs, setCatalogs] = useState<CatalogResponse | null>(null);
+  const [catalogNote, setCatalogNote] = useState("");
+  const [scale, setScale] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const imageRef = useRef<HTMLDivElement>(null);
 
   const allFrames = useMemo(
     () => (result ? [...result.measurements].sort((x, y) => x.time_mjd - y.time_mjd) : []),
@@ -149,6 +182,36 @@ export default function TargetView({
     }
   }, [mode, playing, blinking, speed, count]);
 
+  useEffect(() => {
+    if (!result?.measurements.length) {
+      setScore(null);
+      return;
+    }
+    let active = true;
+    const current = result;
+    (async () => {
+      const broad = await fetchCachedLookup(ra, dec, fieldSize, "");
+      const currentBands = new Set(current.measurements.map((item) => item.detector)).size;
+      const broadBands = broad ? new Set(broad.measurements.map((item) => item.detector)).size : 0;
+      const measurements = broad && broadBands > currentBands ? broad.measurements : current.measurements;
+      const next = await classifyLookup(measurements);
+      if (active) setScore(next);
+    })();
+    return () => { active = false; };
+  }, [result, ra, dec, fieldSize]);
+
+  useEffect(() => {
+    let active = true;
+    setCatalogs(null);
+    setCatalogNote("Asking Gaia and AllWISE…");
+    fetchCatalogs(ra, dec, Math.max(0.02, fieldSize / 2)).then((next) => {
+      if (!active) return;
+      setCatalogs(next);
+      setCatalogNote(next ? "" : "Catalog search did not answer.");
+    });
+    return () => { active = false; };
+  }, [ra, dec, fieldSize]);
+
   const shownIndex = mode === "time" ? frame : mode === "blink" ? (side === "a" ? aIdx : bIdx) : aIdx;
   const shown = frames[shownIndex];
   const frameA = frames[aIdx];
@@ -169,7 +232,27 @@ export default function TargetView({
   }, [frames]);
 
   const gapDays = frameA && frameB ? Math.round(Math.abs(frameB.time_mjd - frameA.time_mjd)) : 0;
-  const viewPath = `/?ra=${ra.toFixed(3)}&dec=${dec.toFixed(3)}`;
+  const viewPath = `/?ra=${ra.toFixed(5)}&dec=${dec.toFixed(5)}`;
+
+  useEffect(() => {
+    setScale(1);
+    setPan({ x: 0, y: 0 });
+  }, [shown?.cutout_url, mode]);
+
+  useEffect(() => {
+    const node = imageRef.current;
+    if (!node) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      setScale((current) => {
+        const next = Math.min(6, Math.max(1, current * (event.deltaY < 0 ? 1.15 : 1 / 1.15)));
+        if (next === 1) setPan({ x: 0, y: 0 });
+        return next;
+      });
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, [tab, mode, shown?.cutout_url]);
 
   function selectFrame(index: number) {
     setPlaying(false);
@@ -192,6 +275,35 @@ export default function TargetView({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch { /* clipboard blocked: the link text stays visible to copy by hand */ }
+  }
+
+  const isSaved = saved.some((spot) => Math.abs(spot.ra - ra) < 1e-4 && Math.abs(spot.dec - dec) < 1e-4);
+
+  function toggleSaved() {
+    const next = isSaved
+      ? saved.filter((spot) => !(Math.abs(spot.ra - ra) < 1e-4 && Math.abs(spot.dec - dec) < 1e-4))
+      : [...saved, { name: targetName, ra, dec }].slice(-12);
+    setSaved(next);
+    try { window.localStorage.setItem(SAVED_KEY, JSON.stringify(next)); } catch { /* private mode: the list lasts for this visit */ }
+  }
+
+  function downloadRecord() {
+    const record = {
+      target: targetName,
+      ra_deg: ra,
+      dec_deg: dec,
+      field_deg: fieldSize,
+      archive: "NASA/IPAC IRSA, SPHEREx",
+      found_via: result?.discovery_source ?? null,
+      images_found: result?.images_found ?? 0,
+      network_read: score,
+      measurements: result?.measurements ?? [],
+    };
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(record, null, 2)], { type: "application/json" }));
+    link.download = `sky-timeline_${ra.toFixed(4)}_${dec.toFixed(4)}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   async function share() {
@@ -233,13 +345,42 @@ export default function TargetView({
         <button type="button" className="tv-ghost" onClick={() => void copyLink()}>{copied ? "Link copied" : "Copy view link"}</button>
       </div>
 
+      <div className="tv-keep">
+        <button type="button" className={`tv-ghost${isSaved ? " is-on" : ""}`} aria-pressed={isSaved} onClick={toggleSaved}>
+          <Star size={14} fill={isSaved ? "currentColor" : "none"} /> {isSaved ? "Saved on this device" : "Save this spot"}
+        </button>
+        <button type="button" className="tv-ghost" disabled={!result?.measurements.length} onClick={downloadRecord}>
+          <Download size={14} /> Download measurements
+        </button>
+        {saved.map((spot) => (
+          <a key={`${spot.ra},${spot.dec}`} className="tv-chip" href={`/?ra=${spot.ra}&dec=${spot.dec}`} title={`RA ${spot.ra.toFixed(4)}°, Dec ${spot.dec.toFixed(4)}°`}>{spot.name}</a>
+        ))}
+      </div>
+
       <div className="tv-tabs" role="tablist" aria-label="Target view sections">
-        {(["blink", "spectrum", "data"] as Tab[]).map((id) => (
+        {([
+          ["blink", "Blink"],
+          ["spectrum", "Spectrum"],
+          ["sources", "Sources"],
+          ["data", "Data"],
+        ] as const).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "is-on" : ""} onClick={() => setTab(id)}>
-            {id === "blink" ? "Blink" : id === "spectrum" ? "Spectrum" : "Data"}
+            {label}
           </button>
         ))}
       </div>
+
+      {result && score && (
+        <div className="tv-score">
+          <span>{scoreLine("Blink read", score.blink?.label, score.blink?.scores)}</span>
+          <span>{scoreLine("Spectrum read", score.spectrum?.label, score.spectrum?.scores)}</span>
+          {score.shift_px !== null && <span>Center of light moved {score.shift_px.toFixed(1)} px between the two previews.</span>}
+          {score.notes?.map((note) => <small key={note}>{note}</small>)}
+          <small>Trained on synthetic cutouts and spectra. These are candidates, not confirmations.</small>
+        </div>
+      )}
+
+      <HelperChat name={targetName} ra={ra} dec={dec} result={result} score={score} catalogs={catalogs} />
 
       {error && <div className="notice" role="alert">{error}</div>}
 
@@ -272,15 +413,45 @@ export default function TargetView({
                   <span>{isCompare ? `${shortDate(frameA.time_mjd)} → ${shortDate(frameB.time_mjd)}` : formatMjd(shown.time_mjd)}</span>
                   <span className="tv-tag">{isCompare ? `A vs B` : `Image ${shownIndex + 1} of ${count}`}</span>
                 </div>
-                <div className="tv-image">
-                  {stageSrc && brokenSrc !== stageSrc ? (
-                    <img src={stageSrc} alt={`SPHEREx ${isCompare ? MODES.find((m) => m.id === mode)?.label.toLowerCase() : "cutout"} for ${targetName}`} onError={() => setBrokenSrc(stageSrc)} draggable={false} />
-                  ) : (
-                    <span className="tv-noimg">{composite.failed || brokenSrc === stageSrc ? "Preview not available" : "Preparing image…"}</span>
-                  )}
-                  <span className="tv-cross" style={{ left: `${(shown ?? frameA).preview_x * 100}%`, top: `${(shown ?? frameA).preview_y * 100}%` }} aria-hidden="true" />
-                  {mode === "blink" && <span className="tv-side">{side.toUpperCase()}</span>}
-                  <span className="tv-band">{detectorOf(shown)} · {shown.wavelength_um.toFixed(2)} µm</span>
+                <div className="tv-image" ref={imageRef}>
+                  <div
+                      className="tv-zoomlayer"
+                      style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
+                      onPointerDown={(event) => {
+                        if (scale <= 1) return;
+                        event.stopPropagation();
+                        const originX = pan.x;
+                        const originY = pan.y;
+                        const startX = event.clientX;
+                        const startY = event.clientY;
+                        const move = (ev: PointerEvent) => setPan({ x: originX + ev.clientX - startX, y: originY + ev.clientY - startY });
+                        const up = () => {
+                          window.removeEventListener("pointermove", move);
+                          window.removeEventListener("pointerup", up);
+                        };
+                        window.addEventListener("pointermove", move);
+                        window.addEventListener("pointerup", up);
+                      }}
+                    >
+                      {stageSrc && brokenSrc !== stageSrc ? (
+                        <img src={stageSrc} alt={`SPHEREx ${isCompare ? MODES.find((m) => m.id === mode)?.label.toLowerCase() : "cutout"} for ${targetName}`} onError={() => setBrokenSrc(stageSrc)} draggable={false} />
+                      ) : (
+                        <span className="tv-noimg">{composite.failed || brokenSrc === stageSrc ? "Preview not available" : "Preparing image…"}</span>
+                      )}
+                      <span className="tv-cross" style={{ left: `${(shown ?? frameA).preview_x * 100}%`, top: `${(shown ?? frameA).preview_y * 100}%` }} aria-hidden="true" />
+                      {mode === "time" && shown?.wcs && catalogs && [...catalogs.gaia, ...catalogs.wise].map((source) => {
+                        const pos = projectSource(shown.wcs as SkyGrid, source.ra, source.dec);
+                        if (!pos) return null;
+                        return <span key={`${source.catalog}-${source.name}`} className={source.catalog === "Gaia DR3" ? "tv-gaia" : "tv-wise"} style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }} title={`${source.catalog} ${source.name}`} />;
+                      })}
+                      {mode === "blink" && <span className="tv-side">{side.toUpperCase()}</span>}
+                      <span className="tv-band">{detectorOf(shown)} · {shown.wavelength_um.toFixed(2)} µm</span>
+                    </div>
+                  <div className="tv-zoom">
+                    <button type="button" aria-label="Zoom out" onClick={() => setScale((value) => { const next = Math.max(1, value / 1.25); if (next === 1) setPan({ x: 0, y: 0 }); return next; })}>−</button>
+                    <button type="button" aria-label="Zoom in" onClick={() => setScale((value) => Math.min(6, value * 1.25))}>+</button>
+                    <button type="button" onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -299,7 +470,7 @@ export default function TargetView({
                 })}
               </div>
             )}
-            <span className="tv-drag">Drag to tilt</span>
+            <span className="tv-drag">{scale > 1 ? "Drag the image to pan" : "Drag to tilt · scroll to zoom"}</span>
           </div>
 
           {mode === "heat" && (
@@ -366,7 +537,7 @@ export default function TargetView({
             </span>
           </div>
 
-          {mode !== "time" && (
+          {mode !== "time" && frameA && frameB && (
             <p className="tv-compare">
               Comparing <strong>A</strong> {formatMjd(frameA.time_mjd)} with <strong>B</strong> {formatMjd(frameB.time_mjd)}, {gapDays} {gapDays === 1 ? "day" : "days"} apart.
               {detectorOf(frameA) !== detectorOf(frameB) || Math.abs(frameA.wavelength_um - frameB.wavelength_um) > 0.05
@@ -383,6 +554,28 @@ export default function TargetView({
         </>
       ) : tab === "spectrum" ? (
         <Spectrum frames={allFrames} current={shown} onPick={(m) => { setDetector("all"); setMode("time"); setTab("blink"); setFrame(allFrames.indexOf(m)); }} />
+      ) : tab === "sources" ? (
+        <div className="tv-sources">
+          <p className="tv-hint">Gaia DR3 stars (circles) and AllWISE sources (squares) already published inside this field. Marks are drawn on the timelapse when that cutout saved its sky grid. Cached example images may list the sources before they can be drawn.</p>
+          {catalogNote && <p className="tv-hint">{catalogNote}</p>}
+          {catalogs?.errors.map((item) => <p key={item} className="tv-hint">{item}</p>)}
+          <div className="tv-table">
+            <table>
+              <thead><tr><th>Catalog</th><th>Name</th><th>RA</th><th>Dec</th><th>Brightness</th></tr></thead>
+              <tbody>
+                {[...(catalogs?.gaia ?? []), ...(catalogs?.wise ?? [])].map((source) => (
+                  <tr key={`${source.catalog}-${source.name}`}>
+                    <td>{source.catalog}</td>
+                    <td>{source.name}</td>
+                    <td>{source.ra.toFixed(5)}</td>
+                    <td>{source.dec.toFixed(5)}</td>
+                    <td>{source.brightness === null ? "—" : `${source.brightness.toFixed(2)} ${source.brightness_label}`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
         <DataTable frames={frames} current={shown} onPick={(index) => { setMode("time"); setTab("blink"); setFrame(index); }} />
       )}
@@ -390,7 +583,7 @@ export default function TargetView({
       {result && (
         <p className="result-caption">
           {result.images_found} images found · {allFrames.length} measured · source {result.discovery_source}
-          {cacheHit ? " · from Redis cache" : " · saved in Redis"}
+          {cacheHit ? " · from the shared cache" : " · saved to the cache"}
         </p>
       )}
     </aside>

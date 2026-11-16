@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, ArrowRight, Crosshair, Globe, Play } from "lucide-react";
-import { fetchCachedLookup, type KnownTarget } from "../lib/spherex";
+import { classifyLookup, fetchCachedLookup, previewSrc, type Classification, type KnownTarget } from "../lib/spherex";
 
 type SectionProps = {
   knownTargets: KnownTarget[];
   onOpenTarget: (targetId: string) => void;
   onExplore: () => void;
+  onShowMovers?: () => void;
 };
 
-const previewUrl = (cutoutUrl: string) => `/api/point/image?cutout_url=${encodeURIComponent(cutoutUrl)}`;
+const previewUrl = previewSrc;
 
 /** Real cached SPHEREx previews for each saved target (first, middle and last image by date). */
 function useTargetPreviews(targets: KnownTarget[]) {
@@ -53,15 +54,36 @@ export function ResearchHub({ knownTargets, onOpenTarget }: SectionProps) {
   const [side, setSide] = useState<"a" | "b">("a");
   const [blinking, setBlinking] = useState(false);
   const [votes, setVotes] = useState<Record<string, Record<string, number>>>({});
+  const [scores, setScores] = useState<Record<string, Classification | null>>({});
   const [message, setMessage] = useState("");
   const candidate = CANDIDATES[index];
   const frames = previews[candidate.targetId] ?? [];
+  const score = scores[candidate.targetId];
+  const blinkLabel = score?.blink ? `${score.blink.label}, ${Math.round((score.blink.scores[score.blink.label] ?? 0) * 100)}%` : "measuring the two images";
+  const spectrumLabel = score?.spectrum ? `${score.spectrum.label}, ${Math.round((score.spectrum.scores[score.spectrum.label] ?? 0) * 100)}%` : "measuring the six detectors";
 
   useEffect(() => {
     if (!blinking) return;
     const timer = window.setInterval(() => setSide((s) => (s === "a" ? "b" : "a")), 500);
     return () => window.clearInterval(timer);
   }, [blinking]);
+
+  useEffect(() => {
+    let active = true;
+    for (const item of CANDIDATES) {
+      const target = knownTargets.find((entry) => entry.id === item.targetId);
+      if (!target) continue;
+      fetchCachedLookup(target.ra, target.dec, 0.1, "")
+        .then(async (cached) => cached ?? fetchCachedLookup(target.ra, target.dec, 0.1, "2"))
+        .then(async (cached) => {
+          if (!active || !cached) return;
+          const score = await classifyLookup(cached.measurements);
+          if (active) setScores((current) => ({ ...current, [item.targetId]: score }));
+        })
+        .catch(() => undefined);
+    }
+    return () => { active = false; };
+  }, [knownTargets]);
 
   function vote(answer: string) {
     setVotes((current) => {
@@ -79,13 +101,13 @@ export function ResearchHub({ knownTargets, onOpenTarget }: SectionProps) {
     <section className="sec-page" aria-labelledby="hub-title">
       <div className="sec-intro">
         <h2 id="hub-title">Research hub</h2>
-        <p>Help check what the software flagged. Look at one candidate at a time and say what you see. Viewing never needs an account. Voting does.</p>
+        <p>Help check what the software flagged. Look at one candidate at a time and say what you see. The scores come from two small networks trained on synthetic images and spectra.</p>
       </div>
       <div className="sec-split">
         <div className="sec-card sec-card-lg">
           <div className="sec-row">
             <span className="sec-kicker">Candidate queue · {index + 1} of {CANDIDATES.length}</span>
-            <span className="sec-tag">Placeholder candidate</span>
+            <span className="sec-tag">Model candidate</span>
           </div>
           <div className="hub-body">
             <div className="hub-image">
@@ -94,8 +116,9 @@ export function ResearchHub({ knownTargets, onOpenTarget }: SectionProps) {
             </div>
             <div className="hub-info">
               <span className="sec-card-title">{candidate.name}</span>
-              <span className="sec-muted">Software&apos;s guess: {candidate.guess}, likely</span>
-              <span className="sec-faint">Confidence score appears here once measured.</span>
+              <span className="sec-muted">Blink read: {blinkLabel}</span>
+              <span className="sec-muted">Spectrum read: {spectrumLabel}</span>
+              <span className="sec-faint">{score?.notes?.[0] ?? "Trained on synthetic examples. A candidate until someone checks it."}</span>
               <button type="button" className={`tv-blink${blinking ? " is-on" : ""}`} disabled={frames.length === 0} onClick={() => setBlinking((b) => !b)}>
                 <ArrowLeftRight size={17} /> {blinking ? "Stop blinking" : "Blink A ⇄ B"}
               </button>
@@ -211,7 +234,7 @@ export function SkyFeed({ knownTargets, onOpenTarget }: SectionProps) {
 
 const MISSIONS = [
   { title: "Find your first brown dwarf", target: "WISE 0855", targetId: "wise-0855", body: "Blink the images, then compare an early one with a late one to see it jump." },
-  { title: "Catch an asteroid", target: "Eros", targetId: null, body: "Two images taken hours apart. Find what slid across." },
+  { title: "Catch an asteroid", target: "Eros", targetId: null, body: "Follow Eros day by day across the globe, then open the SPHEREx images along its path." },
   { title: "Why does this star blink?", target: "R Draconis", targetId: "r-draconis", body: "It isn't moving. Its brightness is changing." },
 ];
 const CONCEPTS = [
@@ -222,7 +245,7 @@ const CONCEPTS = [
   ["Why blinking works", "Your eye catches a jump far faster than a difference."],
 ];
 
-export function Learn({ onOpenTarget }: SectionProps) {
+export function Learn({ onOpenTarget, onShowMovers }: SectionProps) {
   return (
     <section className="sec-page" aria-labelledby="learn-title">
       <div className="sec-intro">
@@ -239,7 +262,7 @@ export function Learn({ onOpenTarget }: SectionProps) {
             {mission.targetId ? (
               <button type="button" className="sec-btn sec-btn-primary" onClick={() => onOpenTarget(mission.targetId)}><Play size={15} /> Start mission</button>
             ) : (
-              <button type="button" className="sec-btn" disabled>Not available yet</button>
+              <button type="button" className="sec-btn sec-btn-primary" onClick={() => onShowMovers?.()}><Play size={15} /> Follow Eros</button>
             )}
           </div>
         ))}
@@ -278,11 +301,11 @@ export function About({ onExplore }: SectionProps) {
         <li>Looking never needs an account.</li>
       </ul>
       <h3>Where the data comes from</h3>
-      <p>Each lookup asks NASA/IPAC&apos;s IRSA archive for the SPHEREx images that cover the spot, then measures the brightness at that exact position in every image. Results are cached, so a spot someone has already loaded opens instantly.</p>
+      <p>Each lookup asks NASA/IPAC&apos;s IRSA archive for the SPHEREx images that cover the spot, then measures the brightness at that exact position in every image. Names go through Sesame. Stars and infrared sources in the field come from Gaia DR3 and AllWISE. JPL Horizons supplies the daily paths of asteroids that spacecraft have visited, drawn straight onto the globe and the map. Two small networks, trained on synthetic cutouts and spectra, suggest whether a pair of images looks settled, moving, changing, or corrupted, and which kind of spectrum the six detectors resemble. Results are cached, so a spot someone has already loaded opens instantly.</p>
       <h3>Link straight to a spot</h3>
       <p>Add a position to the address, like <code>?ra=133.795&amp;dec=-7.245</code>, and the tool opens on that target. The same address can be embedded in another website.</p>
       <h3>Built with</h3>
-      <p>IRSA&apos;s TAP and SIA services through astroquery and PyVO, Astropy for reading the images, Redis for caching, and a FastAPI backend behind this Next.js viewer.</p>
+      <p>IRSA&apos;s TAP and SIA services through astroquery and PyVO, Astropy for reading the images, Gaia and AllWISE for known sources, JPL Horizons for predicted positions, Redis for caching, and a FastAPI backend behind this Next.js viewer.</p>
       <button type="button" className="sec-btn sec-btn-primary sec-btn-lg" onClick={onExplore}>Start exploring <ArrowRight size={16} /></button>
     </section>
   );

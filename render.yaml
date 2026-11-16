@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: thelegend35-sky-viewer-api
+    runtime: python
+    plan: free
+    rootDir: Sky-Viewer
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python -m uvicorn backend.lookup:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"

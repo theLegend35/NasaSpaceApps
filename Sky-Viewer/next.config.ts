@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/api/targets", destination: `${lookupApiUrl}/targets` },
+      { source: "/api/resolve", destination: `${lookupApiUrl}/resolve` },
+      { source: "/api/horizons/path", destination: `${lookupApiUrl}/horizons/path` },
+      { source: "/api/horizons", destination: `${lookupApiUrl}/horizons` },
+      { source: "/api/catalogs", destination: `${lookupApiUrl}/catalogs` },
+      { source: "/api/classify", destination: `${lookupApiUrl}/classify` },
       { source: "/api/point/cache", destination: `${lookupApiUrl}/point/cache` },
       { source: "/api/point/image", destination: `${lookupApiUrl}/point/image` },
       { source: "/api/point/jobs", destination: `${lookupApiUrl}/point/jobs` },

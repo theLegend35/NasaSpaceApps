@@ -9,6 +9,7 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image, ImageOps
+from pydantic import BaseModel
 
 from .cache import (
     get_known_targets,
@@ -17,6 +18,9 @@ from .cache import (
     read_cached_lookup,
     seed_known_targets,
 )
+from .catalogs import catalogs, resolve_name
+from .horizons import path, predict
+from .nets import classify_measurements, ensure_trained
 from .seed import load_seed
 from .service import lookup
 
@@ -27,6 +31,7 @@ jobs_lock = threading.Lock()
 
 @asynccontextmanager
 async def lifespan(_app):
+    ensure_trained()
     seed_known_targets()
     loaded = load_seed()
     if any(loaded.values()):
@@ -38,9 +43,67 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"])
 
 
+class ClassifyBody(BaseModel):
+    measurements: list[dict]
+
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
 @app.get("/targets")
 def targets():
     return get_known_targets()
+
+
+@app.get("/resolve")
+def resolve(name: str):
+    try:
+        found = resolve_name(name)
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=f"Name lookup failed: {error}") from error
+    if found is None:
+        raise HTTPException(status_code=404, detail=f"No sky position for {name}")
+    return found
+
+
+@app.get("/horizons/path")
+def horizons_path(command: str, start: str, days: int = 30):
+    try:
+        return path(command, start, days)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=f"Horizons lookup failed: {error}") from error
+
+
+@app.get("/horizons")
+def horizons(name: str, when: str):
+    try:
+        return predict(name, when)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=f"Horizons lookup failed: {error}") from error
+
+
+@app.get("/catalogs")
+def catalog_search(ra: float, dec: float, radius: float = 0.05):
+    return catalogs(ra, dec, radius)
+
+
+@app.post("/classify")
+def classify(body: ClassifyBody):
+    previews = {}
+    for item in body.measurements:
+        url = item.get("cutout_url")
+        if not url or url in previews:
+            continue
+        preview = get_preview(url)
+        if preview:
+            previews[url] = preview
+    return classify_measurements(body.measurements, previews)
 
 
 def run_lookup_job(job_id: str, ra: float, dec: float, size: float, detector: int | None):

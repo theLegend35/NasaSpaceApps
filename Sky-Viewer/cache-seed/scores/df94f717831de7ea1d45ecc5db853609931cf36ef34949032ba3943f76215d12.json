@@ -1,0 +1,1 @@
+{"blink": {"label": "mover", "scores": {"settled": 0.0, "mover": 1.0, "variable": 3.6614074876910145e-15, "artifact": 5.605193857299268e-45}, "detector": "SPHEREx-D2", "a_mjd": 60908.981929, "b_mjd": 61305.628021}, "spectrum": null, "shift_px": 1.256170766045311, "trained_on": "synthetic cutouts and spectra", "notes": []}

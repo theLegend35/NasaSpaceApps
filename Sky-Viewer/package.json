@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "seed": "node scripts/seed-static.mjs",
+    "predev": "node scripts/seed-static.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/seed-static.mjs",
     "build": "next build",
     "start": "next start"
   },
