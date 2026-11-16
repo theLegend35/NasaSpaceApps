@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { Globe, Link2, Map, Minus, Plus } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { ArrowLeft, Globe, Link2, Map, Minus, Plus } from "lucide-react";
 import ObservationPanel from "../components/ObservationPanel";
 import TargetSidebar from "../components/TargetSidebar";
+import TargetView from "../components/TargetView";
 import { fetchCachedLookup, fetchKnownTargets, loadObservations, type KnownTarget, type LookupJobStatus, type LookupResponse } from "../lib/spherex";
 import SkyGlobe, { SkyMap } from "./SkyGlobe";
 
@@ -18,6 +19,8 @@ export default function Home() {
   const [size, setSize] = useState("0.1");
   const [detector, setDetector] = useState("2");
   const [viewMode, setViewMode] = useState<"globe" | "map">("globe");
+  const [targetView, setTargetView] = useState(false);
+  const pickRef = useRef(0);
   const [zoom, setZoom] = useState(1);
   const [copied, setCopied] = useState(false);
   const [result, setResult] = useState<LookupResponse | null>(null);
@@ -90,15 +93,35 @@ export default function Home() {
     setRa(nextRa.toFixed(5));
     setDec(nextDec.toFixed(5));
     setSelectedTargetId("");
-    setTargetName("Selected sky position");
+    setTargetName("Custom sky region");
     setTargetQuery("");
-    setTargetDescription("ICRS sky position");
+    setTargetDescription("No named object here");
     setResult(null);
     setCacheHit(false);
     setFrameIndex(0);
     setPlaying(false);
     setError("");
     setStatusMessage("Point selected. Locate in sky checks Redis; load observations queries IRSA.");
+  }
+
+  async function pickSkyPoint(nextRa: number, nextDec: number) {
+    setSkyPoint(nextRa, nextDec);
+    setTargetView(true);
+    const pickId = ++pickRef.current;
+    try {
+      const cached = await fetchCachedLookup(Number(nextRa.toFixed(5)), Number(nextDec.toFixed(5)), Number(size), detector);
+      if (pickId !== pickRef.current || !cached) return;
+      setResult(cached);
+      setCacheHit(true);
+      setStatusMessage("Loaded this point from Redis.");
+    } catch {
+      return;
+    }
+  }
+
+  function pickTarget(targetId: string) {
+    void chooseTarget(targetId);
+    setTargetView(true);
   }
 
   function updateCoordinate(axis: "ra" | "dec", value: string) {
@@ -245,8 +268,8 @@ export default function Home() {
         <div className="data-source"><span className="status-dot" /> SPHEREx · IRSA</div>
       </header>
 
-      <div className="explore-layout">
-        <TargetSidebar
+      <div className={targetView ? "explore-layout is-target" : "explore-layout"}>
+        {!targetView && <TargetSidebar
           knownTargets={knownTargets}
           selectedTargetId={selectedTargetId}
           targetQuery={targetQuery}
@@ -266,13 +289,18 @@ export default function Home() {
           onLocateInSky={locateInSky}
           onLoadObservations={() => void search()}
           onChooseTarget={(targetId) => void chooseTarget(targetId)}
-        />
+        />}
 
         <section className="sky-stage" id="explore" aria-label="Explore the sky">
           <div className="stage-heading">
-            <p className="eyebrow">Explore · whole sky</p>
-            <h1>A changing sky, one region at a time</h1>
-            <p>Drag to rotate · click a point to set coordinates</p>
+            <p className="eyebrow">{targetView ? "Target view" : "Explore · whole sky"}</p>
+            <h1>{targetView ? `Zoomed in on ${targetName}` : "A changing sky, one region at a time"}</h1>
+            <p>Drag to rotate · click a target or any spot to go deeper</p>
+            {targetView && (
+              <button type="button" className="copy-link stage-back" onClick={() => setTargetView(false)}>
+                <ArrowLeft size={16} /> Whole sky
+              </button>
+            )}
           </div>
 
           <div className="view-switch" role="group" aria-label="Sky view mode">
@@ -286,9 +314,19 @@ export default function Home() {
 
           <div className="stage-world">
             {viewMode === "globe" ? (
-              <SkyGlobe ra={raNumber} dec={decNumber} zoom={zoom} footprints={footprints} onPick={setSkyPoint} />
+              <SkyGlobe
+                ra={raNumber}
+                dec={decNumber}
+                zoom={zoom}
+                deep={targetView}
+                footprints={footprints}
+                targets={knownTargets}
+                selectedLabel={targetName}
+                onPick={(nextRa, nextDec) => void pickSkyPoint(nextRa, nextDec)}
+                onPickTarget={pickTarget}
+              />
             ) : (
-              <SkyMap ra={raNumber} dec={decNumber} footprints={footprints} onPick={setSkyPoint} />
+              <SkyMap ra={raNumber} dec={decNumber} footprints={footprints} onPick={(nextRa, nextDec) => void pickSkyPoint(nextRa, nextDec)} />
             )}
           </div>
 
@@ -309,6 +347,21 @@ export default function Home() {
           </div>
         </section>
 
+        {targetView ? (
+          <TargetView
+            targetName={targetName}
+            targetDescription={targetDescription}
+            ra={raNumber}
+            dec={decNumber}
+            result={result}
+            cacheHit={cacheHit}
+            error={error}
+            loading={loading}
+            progressText={progressText}
+            statusMessage={statusMessage}
+            onLoadObservations={() => void search()}
+          />
+        ) : (
         <ObservationPanel
           targetName={targetName}
           targetDescription={targetDescription}
@@ -326,6 +379,7 @@ export default function Home() {
           failedPreview={failedPreview}
           onPreviewError={setFailedPreview}
         />
+        )}
       </div>
     </main>
   );
