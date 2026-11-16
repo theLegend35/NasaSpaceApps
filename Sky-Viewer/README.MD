@@ -12,6 +12,20 @@ Start Redis in the first terminal:
 redis-server --bind 127.0.0.1 --port 6379 --dir /tmp --dbfilename spherex-redis.rdb --appendonly yes --appendfilename spherex-redis.aof
 ```
 
+Or run Redis in Docker instead:
+
+```sh
+docker run -d --name redis -p 6379:6379 redis
+```
+
+To keep newly loaded points when the container is removed or recreated, give it a volume:
+
+```sh
+docker run -d --name redis -p 6379:6379 -v spherex-redis:/data redis redis-server --appendonly yes
+```
+
+Either way, nothing needs to be copied into the container. The API loads the shared cache from `cache-seed/` into whichever Redis it connects to (see [Shared cache](#shared-cache)). Start Redis before the API so the seed loads at startup.
+
 Install and start the API in the second terminal:
 
 ```sh
@@ -42,7 +56,9 @@ After loading new points, export them so they can be committed:
 python -m backend.seed export
 ```
 
-To load the seed into Redis without restarting the API, run `python -m backend.seed load`.
+To load the seed into Redis without restarting the API, run `python -m backend.seed load`. Use this if Redis was started after the API, or after a Docker Redis container was removed and recreated.
+
+`backend.seed` is the module path for `backend/seed.py`. Run both commands from the `Sky-Viewer` directory with the virtual environment active. They use `REDIS_URL` when it is set, for example `REDIS_URL=redis://localhost:6380/0` for a container mapped to another port.
 
 **Locate in sky** only updates the selected coordinates and checks Redis; it does not contact the archive. Use **Load observations** to run TAP/SIA discovery for a cache miss.
 
